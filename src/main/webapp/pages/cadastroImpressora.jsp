@@ -54,6 +54,9 @@
             border-radius: 8px;
             margin-top: 10px;
         }
+        .alert-calculo {
+            transition: all 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -75,12 +78,12 @@
                         <%= isEdicao ? "Editar Impressora" : "Nova Impressora" %>
                     </h4>
                 </div>
-<div class="card-body p-4">
-    <form action="<%= request.getContextPath() %>/ImpressoraController" method="post">
-        <input type="hidden" name="action" value="<%= isEdicao ? "editar" : "adicionar" %>">
-        <% if (isEdicao) { %>
-            <input type="hidden" name="id" value="<%= impressoraEdicao.getId() %>">
-        <% } %>
+                <div class="card-body p-4">
+                    <form action="<%= request.getContextPath() %>/ImpressoraController" method="post">
+                        <input type="hidden" name="action" value="<%= isEdicao ? "editar" : "adicionar" %>">
+                        <% if (isEdicao) { %>
+                            <input type="hidden" name="id" value="<%= impressoraEdicao.getId() %>">
+                        <% } %>
 
                         <div class="row">
                             <!-- Secretaria -->
@@ -165,27 +168,28 @@
                         </div>
 
                         <div class="row">
-                            <!-- Contador de Impressões -->
+                            <!-- Contador de Impressões Atual -->
                             <div class="col-md-6 mb-3">
                                 <label for="contadorImpressoes" class="form-label">
                                     <i class="bi bi-file-earmark-text"></i> Contador de Impressões Atual *
                                 </label>
                                 <input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes" 
                                        value="<%= isEdicao ? impressoraEdicao.getContadorImpressoes() : 0 %>" 
-                                       min="0" required placeholder="0">
+                                       min="0" required placeholder="0" oninput="calcularImpressoesMes()">
                             </div>
 
-                            <!-- Contador Anterior (somente leitura se edição) -->
+                            <!-- Contador Anterior (EDITÁVEL) -->
                             <div class="col-md-6 mb-3">
                                 <label for="contadorAnterior" class="form-label">
                                     <i class="bi bi-clock-history"></i> Contador do Mês Anterior
+                                    <span class="badge bg-info ms-2">Editável</span>
                                 </label>
                                 <input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior" 
                                        value="<%= isEdicao && impressoraEdicao.getContadorAnterior() != null ? impressoraEdicao.getContadorAnterior() : "" %>" 
-                                       min="0" placeholder="0" <%= isEdicao ? "readonly" : "" %>>
+                                       min="0" placeholder="Deixe vazio para atualizar automaticamente" oninput="calcularImpressoesMes()">
                                 <small class="form-text text-muted">
                                     <% if (isEdicao) { %>
-                                        Atualizado automaticamente ao editar
+                                        💡 <strong>Edite este valor se precisar corrigir.</strong> Deixe vazio para atualizar automaticamente.
                                     <% } else { %>
                                         Opcional - para primeira inserção
                                     <% } %>
@@ -193,18 +197,24 @@
                             </div>
                         </div>
 
-                        <!-- Informação sobre Impressões do Mês -->
+                        <!-- Exibição do cálculo em tempo real -->
                         <% if (isEdicao && impressoraEdicao.getContadorAnterior() != null) { %>
-                        <div class="info-box">
-                            <strong><i class="bi bi-info-circle"></i> Impressões deste mês:</strong> 
-                            <%= String.format("%,d", impressoraEdicao.getImpressoesDoMes()) %> impressões
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info alert-calculo" id="alertImpressoesMes">
+                                    <strong><i class="bi bi-calculator"></i> Impressões deste mês:</strong> 
+                                    <span id="impressoesMesCalculado">
+                                        <%= String.format("%,d", impressoraEdicao.getImpressoesDoMes()) %>
+                                    </span> impressões
+                                </div>
+                            </div>
                         </div>
                         <% } %>
 
                         <hr class="my-4">
 
                         <div class="d-flex justify-content-between">
-                           <a href="<%= request.getContextPath() %>/ImpressoraController" class="btn btn-secondary">
+                            <a href="<%= request.getContextPath() %>/ImpressoraController" class="btn btn-secondary">
                                 <i class="bi bi-arrow-left"></i> Voltar
                             </a>
                             <button type="submit" class="btn btn-success">
@@ -223,14 +233,57 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-// Validação do formulário
-document.querySelector('form').addEventListener('submit', function(e) {
-    const contador = document.getElementById('contadorImpressoes').value;
+// Calcular impressões do mês em tempo real
+function calcularImpressoesMes() {
+    var contadorAtual = parseInt(document.getElementById('contadorImpressoes').value) || 0;
+    var contadorAnteriorInput = document.getElementById('contadorAnterior').value;
+    var contadorAnterior = contadorAnteriorInput ? parseInt(contadorAnteriorInput) : 0;
     
-    if (contador < 0) {
+    var elemento = document.getElementById('impressoesMesCalculado');
+    var alert = document.getElementById('alertImpressoesMes');
+    
+    if (elemento && contadorAnteriorInput) {
+        var impressoesMes = contadorAtual - contadorAnterior;
+        elemento.textContent = impressoesMes.toLocaleString('pt-BR');
+        
+        // Alterar cor conforme o resultado
+        if (impressoesMes < 0) {
+            alert.className = 'alert alert-warning alert-calculo';
+            elemento.innerHTML = '<strong style="color: #d9534f;">' + impressoesMes.toLocaleString('pt-BR') + '</strong> impressões ⚠️ (NEGATIVO!)';
+        } else if (impressoesMes === 0) {
+            alert.className = 'alert alert-secondary alert-calculo';
+            elemento.innerHTML = impressoesMes.toLocaleString('pt-BR') + ' impressões';
+        } else {
+            alert.className = 'alert alert-info alert-calculo';
+            elemento.innerHTML = impressoesMes.toLocaleString('pt-BR') + ' impressões';
+        }
+    }
+}
+
+// Validação antes de enviar
+document.querySelector('form').addEventListener('submit', function(e) {
+    const contadorAtual = parseInt(document.getElementById('contadorImpressoes').value) || 0;
+    const contadorAnteriorInput = document.getElementById('contadorAnterior').value;
+    const contadorAnterior = contadorAnteriorInput ? parseInt(contadorAnteriorInput) : 0;
+    
+    if (contadorAtual < 0) {
         e.preventDefault();
-        alert('O contador de impressões não pode ser negativo!');
-        return;
+        alert('❌ O contador de impressões não pode ser negativo!');
+        return false;
+    }
+    
+    // Avisar se o contador diminuiu (e o usuário preencheu o contador anterior)
+    if (contadorAnteriorInput && contadorAtual < contadorAnterior) {
+        var diferenca = contadorAnterior - contadorAtual;
+        if (!confirm('⚠️ ATENÇÃO: O contador atual é MENOR que o contador anterior!\n\n' +
+                     'Contador anterior: ' + contadorAnterior.toLocaleString('pt-BR') + '\n' +
+                     'Contador atual: ' + contadorAtual.toLocaleString('pt-BR') + '\n\n' +
+                     'Isso resultará em: -' + diferenca.toLocaleString('pt-BR') + ' impressões (NEGATIVO)\n\n' +
+                     '💡 DICA: Se cometeu um erro, edite o "Contador do Mês Anterior" para o valor correto.\n\n' +
+                     'Deseja continuar mesmo assim?')) {
+            e.preventDefault();
+            return false;
+        }
     }
 });
 

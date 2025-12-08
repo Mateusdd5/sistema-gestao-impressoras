@@ -15,7 +15,9 @@ import java.io.PrintWriter;
 import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @WebServlet("/ImpressoraController")
 public class ImpressoraController extends HttpServlet {
@@ -153,9 +155,13 @@ public class ImpressoraController extends HttpServlet {
             dataUltimaManutencao = LocalDate.parse(dataManutencaoStr, DateTimeFormatter.ISO_LOCAL_DATE);
         }
 
+        // Detectar custo por impressão automaticamente
+        BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
+
         Impressora impressora = new Impressora(
             localInstalacao.trim(),
             modeloEquipamento.trim(),
+            custoPorImpressao,
             numeroSerie.trim(),
             contadorImpressoes,
             contadorAnterior,
@@ -204,10 +210,14 @@ public class ImpressoraController extends HttpServlet {
             dataUltimaManutencao = LocalDate.parse(dataManutencaoStr, DateTimeFormatter.ISO_LOCAL_DATE);
         }
 
+        // Detectar custo por impressão automaticamente
+        BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
+
         Impressora impressora = new Impressora(
             id,
             localInstalacao.trim(),
             modeloEquipamento.trim(),
+            custoPorImpressao,
             numeroSerie.trim(),
             contadorImpressoes,
             contadorAnterior,
@@ -346,6 +356,7 @@ public class ImpressoraController extends HttpServlet {
         String secretaria = request.getParameter("secretaria");
         
         List<Impressora> listaImpressoras;
+        Map<String, BigDecimal> custosPorSecretaria = impressoraDAO.calcularCustoMensalPorSecretaria();
         
         if (secretaria != null && !secretaria.trim().isEmpty() && !secretaria.equals("TODAS")) {
             listaImpressoras = impressoraDAO.listarImpressorasPorSecretaria(secretaria);
@@ -356,6 +367,7 @@ public class ImpressoraController extends HttpServlet {
 
         request.setAttribute("listaImpressoras", listaImpressoras);
         request.setAttribute("secretariaFiltro", secretaria);
+        request.setAttribute("custosPorSecretaria", custosPorSecretaria);
         
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/relatorioImpressao.jsp");
         dispatcher.forward(request, response);

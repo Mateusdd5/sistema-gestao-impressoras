@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.util.List;
+import java.util.Locale;
 
 @WebServlet("/ExportarCsvServlet")
 public class ExportarCsvServlet extends HttpServlet {
@@ -44,9 +47,10 @@ public class ExportarCsvServlet extends HttpServlet {
             
             PrintWriter writer = response.getWriter();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
             
             // Cabeçalho do CSV
-            writer.println("Secretaria;Local de Instalação;Modelo;Número de Série;Contador Atual;Contador Anterior;Impressões do Mês;Último Relatório;Status");
+            writer.println("Secretaria;Local de Instalação;Modelo;Número de Série;Contador Atual;Contador Anterior;Impressões do Mês;Custo/Página;Custo Mensal;Último Relatório;Status");
             
             // Dados
             for (Impressora imp : listaImpressoras) {
@@ -57,6 +61,21 @@ public class ExportarCsvServlet extends HttpServlet {
                 writer.print(imp.getContadorImpressoes() + ";");
                 writer.print((imp.getContadorAnterior() != null ? imp.getContadorAnterior() : "0") + ";");
                 writer.print(imp.getImpressoesDoMes() + ";");
+                
+                // Custo por impressão
+                if (imp.getCustoPorImpressao() != null) {
+                    writer.print(currencyFormat.format(imp.getCustoPorImpressao()) + ";");
+                } else {
+                    writer.print("N/A;");
+                }
+                
+                // Custo mensal
+                if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes() > 0) {
+                    writer.print(currencyFormat.format(imp.getCustoMensal()) + ";");
+                } else {
+                    writer.print("R$ 0,00;");
+                }
+                
                 writer.print((imp.getDataUltimaManutencao() != null ? imp.getDataUltimaManutencao().format(formatter) : "-") + ";");
                 writer.println(imp.getStatus());
             }

@@ -2,6 +2,9 @@
 <%@ page import="model.Impressora" %>
 <%@ page import="java.util.List" %>
 <%@ page import="java.time.format.DateTimeFormatter" %>
+<%@ page import="java.text.NumberFormat" %>
+<%@ page import="java.util.Locale" %>
+<%@ page import="java.math.BigDecimal" %>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -162,6 +165,11 @@
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
 
+        .custo-destaque {
+            font-weight: bold;
+            color: #28a745;
+        }
+
         @media (max-width: 992px) {
             .main-container {
                 flex-direction: column;
@@ -180,6 +188,13 @@
         .export-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .export-buttons .btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
     </style>
 </head>
@@ -202,6 +217,7 @@
     if (secretariaSelecionada == null) secretariaSelecionada = "TODAS";
     
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
 %>
 
 <div class="main-container">
@@ -244,6 +260,9 @@
                         </a>
                         <a href="ExportarCsvServlet" class="btn btn-success">
                             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
+                        </a>
+                        <a href="ExportarExcelServlet" class="btn btn-success">
+                            <i class="bi bi-file-earmark-excel"></i> Exportar Excel
                         </a>
                         <a href="ImpressoraController?action=relatorioImpressao&secretaria=<%= secretariaSelecionada %>" 
                            class="btn btn-info" target="_blank">
@@ -292,7 +311,8 @@
                                     <th>Modelo</th>
                                     <th>Nº Série</th>
                                     <th>Contador Atual</th>
-                                    <th>Impressões do Mês</th>
+                                    <th>Impressões/Mês</th>
+                                    <th>Custo Mensal</th>
                                     <th>Último Relatório</th>
                                     <th>Status</th>
                                     <th class="text-center">Ações</th>
@@ -319,6 +339,15 @@
                                                 </span>
                                             <% } else { %>
                                                 <span class="text-muted">-</span>
+                                            <% } %>
+                                        </td>
+                                        <td>
+                                            <% if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes() > 0) { %>
+                                                <span class="custo-destaque">
+                                                    <%= currencyFormat.format(imp.getCustoMensal()) %>
+                                                </span>
+                                            <% } else { %>
+                                                <span class="text-muted">R$ 0,00</span>
                                             <% } %>
                                         </td>
                                         <td>

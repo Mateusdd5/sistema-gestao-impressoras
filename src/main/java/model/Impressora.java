@@ -1,18 +1,20 @@
 package model;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 public class Impressora {
 
     private Integer id;
     private String localInstalacao;
     private String modeloEquipamento;
+    private BigDecimal custoPorImpressao;  // NOVO
     private String numeroSerie;
     private Integer contadorImpressoes;
-    private Integer contadorAnterior;  // NOVO
+    private Integer contadorAnterior;
     private LocalDate dataUltimaManutencao;
     private String secretaria;
-    private String status;  // NOVO
+    private String status;
 
     public Impressora() {
     }
@@ -21,11 +23,12 @@ public class Impressora {
         this.id = id;
     }
 
-    public Impressora(String localInstalacao, String modeloEquipamento, String numeroSerie, 
-                     Integer contadorImpressoes, Integer contadorAnterior, 
+    public Impressora(String localInstalacao, String modeloEquipamento, BigDecimal custoPorImpressao,
+                     String numeroSerie, Integer contadorImpressoes, Integer contadorAnterior, 
                      LocalDate dataUltimaManutencao, String secretaria, String status) {
         this.localInstalacao = localInstalacao;
         this.modeloEquipamento = modeloEquipamento;
+        this.custoPorImpressao = custoPorImpressao;
         this.numeroSerie = numeroSerie;
         this.contadorImpressoes = contadorImpressoes;
         this.contadorAnterior = contadorAnterior;
@@ -35,11 +38,12 @@ public class Impressora {
     }
 
     public Impressora(Integer id, String localInstalacao, String modeloEquipamento, 
-                     String numeroSerie, Integer contadorImpressoes, Integer contadorAnterior,
-                     LocalDate dataUltimaManutencao, String secretaria, String status) {
+                     BigDecimal custoPorImpressao, String numeroSerie, Integer contadorImpressoes, 
+                     Integer contadorAnterior, LocalDate dataUltimaManutencao, String secretaria, String status) {
         this.id = id;
         this.localInstalacao = localInstalacao;
         this.modeloEquipamento = modeloEquipamento;
+        this.custoPorImpressao = custoPorImpressao;
         this.numeroSerie = numeroSerie;
         this.contadorImpressoes = contadorImpressoes;
         this.contadorAnterior = contadorAnterior;
@@ -54,6 +58,55 @@ public class Impressora {
             return 0;
         }
         return contadorImpressoes - contadorAnterior;
+    }
+
+    // NOVO - Método para calcular custo mensal da impressora
+    public BigDecimal getCustoMensal() {
+        if (custoPorImpressao == null || custoPorImpressao.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+        Integer impressoes = getImpressoesDoMes();
+        return custoPorImpressao.multiply(new BigDecimal(impressoes));
+    }
+
+    // NOVO - Método estático para detectar custo por modelo
+    public static BigDecimal detectarCustoPorModelo(String modelo) {
+        if (modelo == null || modelo.trim().isEmpty()) {
+            return null;
+        }
+        
+        String modeloUpper = modelo.toUpperCase().replaceAll("\\s+", "");
+        
+        // M-3655IDN = R$ 0,12
+        if (modeloUpper.contains("M-3655") || modeloUpper.contains("M3655")) {
+            return new BigDecimal("0.12");
+        }
+        
+        // M-2040DN/L = R$ 0,07
+        if (modeloUpper.contains("M-2040") || modeloUpper.contains("M2040")) {
+            return new BigDecimal("0.07");
+        }
+        
+        // P3145DN/HLL 6202DW = R$ 0,07
+        if (modeloUpper.contains("P-3145") || modeloUpper.contains("P3145") ||
+            modeloUpper.contains("HL") && modeloUpper.contains("6202") ||
+            modeloUpper.contains("HLL") && modeloUpper.contains("6202")) {
+            return new BigDecimal("0.07");
+        }
+        
+        // P-6235CDN = R$ 0,69
+        if (modeloUpper.contains("P-6235") || modeloUpper.contains("P6235")) {
+            return new BigDecimal("0.69");
+        }
+        
+        // CANON/TM-300 = R$ 14,37
+        if (modeloUpper.contains("TM-300") || modeloUpper.contains("TM300") ||
+            (modeloUpper.contains("CANON") && modeloUpper.contains("300"))) {
+            return new BigDecimal("14.37");
+        }
+        
+        // Modelo não reconhecido
+        return null;
     }
 
     // Getters e Setters
@@ -79,6 +132,14 @@ public class Impressora {
 
     public void setModeloEquipamento(String modeloEquipamento) {
         this.modeloEquipamento = modeloEquipamento;
+    }
+
+    public BigDecimal getCustoPorImpressao() {
+        return custoPorImpressao;
+    }
+
+    public void setCustoPorImpressao(BigDecimal custoPorImpressao) {
+        this.custoPorImpressao = custoPorImpressao;
     }
 
     public String getNumeroSerie() {
@@ -135,6 +196,7 @@ public class Impressora {
                 "id=" + id +
                 ", localInstalacao='" + localInstalacao + '\'' +
                 ", modeloEquipamento='" + modeloEquipamento + '\'' +
+                ", custoPorImpressao=" + custoPorImpressao +
                 ", numeroSerie='" + numeroSerie + '\'' +
                 ", contadorImpressoes=" + contadorImpressoes +
                 ", contadorAnterior=" + contadorAnterior +
