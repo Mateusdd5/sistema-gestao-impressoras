@@ -1,5 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="model.Impressora" %>
+<%@ page import="model.Usuario" %>
+<%@ page import="utils.SessaoUtil" %>
 <%@ page import="java.util.List" %>
 <%@ page import="java.time.format.DateTimeFormatter" %>
 <%@ page import="java.text.NumberFormat" %>
@@ -20,6 +22,52 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px 0;
+        }
+
+        /* Navbar de usuário */
+        .user-navbar {
+            background: white;
+            border-radius: 15px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .user-details h6 {
+            margin: 0;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .user-details small {
+            color: #6c757d;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 10px;
         }
 
         .main-container {
@@ -200,6 +248,9 @@
 </head>
 <body>
 <%
+    // Obter usuário logado
+    Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
+    
     @SuppressWarnings("unchecked")
     List<Impressora> listaImpressoras = (List<Impressora>) request.getAttribute("listaImpressoras");
     
@@ -219,6 +270,34 @@
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
 %>
+
+<!-- Navbar de usuário -->
+<div class="container-fluid" style="max-width: 1800px; padding: 0 20px;">
+    <div class="user-navbar">
+        <div class="user-info">
+            <div class="user-avatar">
+                <%= usuarioLogado.getNomeCompleto().substring(0, 1).toUpperCase() %>
+            </div>
+            <div class="user-details">
+                <h6><%= usuarioLogado.getNomeCompleto() %></h6>
+                <small>
+                    <i class="bi bi-shield-check"></i>
+                    <%= usuarioLogado.getNivelPermissaoDescricao() %>
+                </small>
+            </div>
+        </div>
+        <div class="navbar-actions">
+            <% if (usuarioLogado.podeGerenciarUsuarios()) { %>
+                <a href="<%= request.getContextPath() %>/UsuarioController" class="btn btn-outline-primary">
+                    <i class="bi bi-people"></i> Usuários
+                </a>
+            <% } %>
+            <a href="<%= request.getContextPath() %>/logout" class="btn btn-outline-danger">
+                <i class="bi bi-box-arrow-right"></i> Sair
+            </a>
+        </div>
+    </div>
+</div>
 
 <div class="main-container">
     <!-- Sidebar de Secretarias -->
@@ -255,9 +334,11 @@
                         <i class="bi bi-printer"></i> Controle de Impressoras
                     </h4>
                     <div class="export-buttons">
-                        <a href="pages/cadastroImpressora.jsp" class="btn btn-light">
-                            <i class="bi bi-plus-circle"></i> Nova Impressora
-                        </a>
+                        <% if (usuarioLogado.podeCadastrar()) { %>
+                            <a href="<%= request.getContextPath() %>/ImpressoraController?action=novoCadastro" class="btn btn-light">
+                                <i class="bi bi-plus-circle"></i> Nova Impressora
+                            </a>
+                        <% } %>
                         <a href="ExportarCsvServlet" class="btn btn-success">
                             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
                         </a>
@@ -370,15 +451,19 @@
                                             <% } %>
                                         </td>
                                         <td class="text-center action-buttons">
-                                            <a href="ImpressoraController?action=editar&id=<%= imp.getId() %>" 
-                                               class="btn btn-sm btn-warning" title="Editar">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <button type="button" class="btn btn-sm btn-danger" 
-                                                    onclick="confirmarExclusao(<%= imp.getId() %>, '<%= imp.getModeloEquipamento() %>')" 
-                                                    title="Excluir">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
+                                            <% if (usuarioLogado.podeEditarContadores()) { %>
+                                                <a href="ImpressoraController?action=editar&id=<%= imp.getId() %>" 
+                                                   class="btn btn-sm btn-warning" title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            <% } %>
+                                            <% if (usuarioLogado.podeDeletar()) { %>
+                                                <button type="button" class="btn btn-sm btn-danger" 
+                                                        onclick="confirmarExclusao(<%= imp.getId() %>, '<%= imp.getModeloEquipamento() %>')" 
+                                                        title="Excluir">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            <% } %>
                                         </td>
                                     </tr>
                                 <% } %>
@@ -392,9 +477,11 @@
                                 <p>Tente ajustar os filtros de busca.</p>
                             <% } else { %>
                                 <p>Comece cadastrando a primeira impressora!</p>
-                                <a href="pages/cadastroImpressora.jsp" class="btn btn-primary mt-2">
-                                    <i class="bi bi-plus-circle"></i> Cadastrar Impressora
-                                </a>
+                                <% if (usuarioLogado.podeCadastrar()) { %>
+                                    <a href="<%= request.getContextPath() %>/ImpressoraController?action=novoCadastro" class="btn btn-primary mt-2">
+                                        <i class="bi bi-plus-circle"></i> Cadastrar Impressora
+                                    </a>
+                                <% } %>
                             <% } %>
                         </div>
                     <% } %>

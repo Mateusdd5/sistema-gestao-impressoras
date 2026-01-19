@@ -13,6 +13,7 @@ import utils.Conexao;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
@@ -22,61 +23,65 @@ import java.util.Map;
 @WebServlet("/ImpressoraController")
 public class ImpressoraController extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    private ImpressoraDAO impressoraDAO;
-
-    @Override
-    public void init() throws ServletException {
-        try {
-            Connection conexao = Conexao.getConnection();
-            impressoraDAO = new ImpressoraDAO(conexao);
-            System.out.println("ImpressoraController inicializado com sucesso!");
-        } catch (Exception e) {
-            throw new ServletException("Erro ao inicializar ImpressoraController: " + e.getMessage(), e);
-        }
-    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        
         String action = request.getParameter("action");
 
-        try {
+        // Criar conexão DENTRO do método
+        try (Connection conexao = Conexao.getConnection()) {
+            ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
+            
             if (action == null) {
-                listarImpressoras(request, response);
+                listarImpressoras(request, response, impressoraDAO);
             } else {
                 switch (action) {
                     case "buscar":
-                        buscarImpressoras(request, response);
+                        buscarImpressoras(request, response, impressoraDAO);
                         break;
                     case "filtrarSecretaria":
-                        filtrarPorSecretaria(request, response);
+                        filtrarPorSecretaria(request, response, impressoraDAO);
                         break;
                     case "editar":
-                        exibirFormularioEdicao(request, response);
+                        exibirFormularioEdicao(request, response, impressoraDAO);
+                        break;
+                    case "novoCadastro":
+                        exibirFormularioCadastro(request, response, impressoraDAO);
                         break;
                     case "relatorioImpressao":
-                        exibirRelatorioImpressao(request, response);
+                        exibirRelatorioImpressao(request, response, impressoraDAO);
                         break;
                     default:
-                        listarImpressoras(request, response);
+                        listarImpressoras(request, response, impressoraDAO);
                         break;
                 }
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                             "Erro ao processar requisição: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro ao processar requisição: " + e.getMessage());
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                             "Erro ao processar requisição: " + e.getMessage());
         }
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        
         request.setCharacterEncoding("UTF-8");
         response.setCharacterEncoding("UTF-8");
 
         String action = request.getParameter("action");
 
-        try {
+        // Criar conexão DENTRO do método
+        try (Connection conexao = Conexao.getConnection()) {
+            ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
+            
             if (action == null) {
                 response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Ação não especificada");
                 return;
@@ -84,25 +89,31 @@ public class ImpressoraController extends HttpServlet {
 
             switch (action) {
                 case "adicionar":
-                    adicionarImpressora(request, response);
+                    adicionarImpressora(request, response, impressoraDAO);
                     break;
                 case "editar":
-                    editarImpressora(request, response);
+                    editarImpressora(request, response, impressoraDAO);
                     break;
                 case "deletar":
-                    deletarImpressora(request, response);
+                    deletarImpressora(request, response, impressoraDAO);
                     break;
                 default:
                     response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Ação inválida");
                     break;
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                             "Erro ao processar requisição: " + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro ao processar requisição: " + e.getMessage());
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                             "Erro ao processar requisição: " + e.getMessage());
         }
     }
 
-    private void adicionarImpressora(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void adicionarImpressora(HttpServletRequest request, HttpServletResponse response, 
+                                     ImpressoraDAO impressoraDAO) throws Exception {
         String localInstalacao = request.getParameter("localInstalacao");
         String modeloEquipamento = request.getParameter("modeloEquipamento");
         String numeroSerie = request.getParameter("numeroSerie");
@@ -181,7 +192,8 @@ public class ImpressoraController extends HttpServlet {
         out.close();
     }
 
-    private void editarImpressora(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void editarImpressora(HttpServletRequest request, HttpServletResponse response,
+                                  ImpressoraDAO impressoraDAO) throws Exception {
         String idStr = request.getParameter("id");
         String localInstalacao = request.getParameter("localInstalacao");
         String modeloEquipamento = request.getParameter("modeloEquipamento");
@@ -237,7 +249,8 @@ public class ImpressoraController extends HttpServlet {
         out.close();
     }
 
-    private void deletarImpressora(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void deletarImpressora(HttpServletRequest request, HttpServletResponse response,
+                                   ImpressoraDAO impressoraDAO) throws Exception {
         String idStr = request.getParameter("id");
 
         if (idStr == null || idStr.trim().isEmpty()) {
@@ -257,7 +270,8 @@ public class ImpressoraController extends HttpServlet {
         out.close();
     }
 
-    private void listarImpressoras(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void listarImpressoras(HttpServletRequest request, HttpServletResponse response,
+                                   ImpressoraDAO impressoraDAO) throws Exception {
         List<Impressora> listaImpressoras = impressoraDAO.listarImpressoras();
         List<String> listaSecretarias = impressoraDAO.listarSecretarias();
         int totalImpressoras = impressoraDAO.contarImpressoras();
@@ -273,13 +287,14 @@ public class ImpressoraController extends HttpServlet {
         request.setAttribute("totalResultados", totalImpressoras);
         request.setAttribute("temFiltro", false);
         request.setAttribute("filtroAtual", "");
-        request.setAttribute("secretariaSelecionada", "");
+        request.setAttribute("secretariaSelecionada", "TODAS");
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/listaImpressoras.jsp");
         dispatcher.forward(request, response);
     }
 
-    private void buscarImpressoras(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void buscarImpressoras(HttpServletRequest request, HttpServletResponse response,
+                                   ImpressoraDAO impressoraDAO) throws Exception {
         String filtro = request.getParameter("filtro");
         
         List<Impressora> listaImpressoras;
@@ -298,13 +313,14 @@ public class ImpressoraController extends HttpServlet {
         request.setAttribute("totalResultados", totalResultados);
         request.setAttribute("temFiltro", filtro != null && !filtro.trim().isEmpty());
         request.setAttribute("filtroAtual", filtro != null ? filtro : "");
-        request.setAttribute("secretariaSelecionada", "");
+        request.setAttribute("secretariaSelecionada", "TODAS");
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/listaImpressoras.jsp");
         dispatcher.forward(request, response);
     }
 
-    private void filtrarPorSecretaria(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void filtrarPorSecretaria(HttpServletRequest request, HttpServletResponse response,
+                                      ImpressoraDAO impressoraDAO) throws Exception {
         String secretaria = request.getParameter("secretaria");
         
         List<Impressora> listaImpressoras;
@@ -331,7 +347,31 @@ public class ImpressoraController extends HttpServlet {
         dispatcher.forward(request, response);
     }
 
-    private void exibirFormularioEdicao(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    /**
+     * Exibe formulário de cadastro de nova impressora
+     */
+    private void exibirFormularioCadastro(HttpServletRequest request, HttpServletResponse response,
+                                          ImpressoraDAO impressoraDAO) throws Exception {
+        
+        // Carregar lista de secretarias
+        List<String> listaSecretarias = impressoraDAO.listarSecretarias();
+        
+        System.out.println("========== FORMULÁRIO CADASTRO ==========");
+        System.out.println("Secretarias carregadas: " + (listaSecretarias != null ? listaSecretarias.size() : "NULL"));
+        if (listaSecretarias != null && !listaSecretarias.isEmpty()) {
+            System.out.println("Primeira secretaria: " + listaSecretarias.get(0));
+        }
+        System.out.println("=========================================");
+        
+        request.setAttribute("listaSecretarias", listaSecretarias);
+        request.setAttribute("impressora", null); // Não está editando
+        
+        RequestDispatcher dispatcher = request.getRequestDispatcher("pages/cadastroImpressora.jsp");
+        dispatcher.forward(request, response);
+    }
+
+    private void exibirFormularioEdicao(HttpServletRequest request, HttpServletResponse response,
+                                        ImpressoraDAO impressoraDAO) throws Exception {
         String idStr = request.getParameter("id");
         
         if (idStr == null || idStr.trim().isEmpty()) {
@@ -347,12 +387,23 @@ public class ImpressoraController extends HttpServlet {
             return;
         }
 
+        // CARREGAR LISTA DE SECRETARIAS!
+        List<String> listaSecretarias = impressoraDAO.listarSecretarias();
+        
+        System.out.println("========== FORMULÁRIO EDIÇÃO ==========");
+        System.out.println("Impressora ID: " + impressora.getId());
+        System.out.println("Secretarias carregadas: " + (listaSecretarias != null ? listaSecretarias.size() : "NULL"));
+        System.out.println("=======================================");
+
         request.setAttribute("impressora", impressora);
+        request.setAttribute("listaSecretarias", listaSecretarias);
+        
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/cadastroImpressora.jsp");
         dispatcher.forward(request, response);
     }
 
-    private void exibirRelatorioImpressao(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    private void exibirRelatorioImpressao(HttpServletRequest request, HttpServletResponse response,
+                                          ImpressoraDAO impressoraDAO) throws Exception {
         String secretaria = request.getParameter("secretaria");
         
         List<Impressora> listaImpressoras;

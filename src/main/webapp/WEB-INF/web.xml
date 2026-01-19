@@ -1,44 +1,65 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee 
-         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
          version="6.0">
 
     <display-name>Sistema de Controle de Impressoras</display-name>
-    <description>
-        Sistema web para controle e gerenciamento de impressoras por secretaria
-    </description>
 
-    <!-- Página inicial -->
     <welcome-file-list>
-        <welcome-file>ImpressoraController</welcome-file>
-        <welcome-file>index.jsp</welcome-file>
-        <welcome-file>index.html</welcome-file>
+        <welcome-file>pages/login.jsp</welcome-file>
     </welcome-file-list>
 
-    <!-- Configuração de codificação UTF-8 -->
+    <session-config>
+        <session-timeout>480</session-timeout>
+    </session-config>
+
+    <!-- Filtro de autenticação (SOMENTE controllers) -->
     <filter>
-        <filter-name>encodingFilter</filter-name>
-        <filter-class>org.apache.catalina.filters.SetCharacterEncodingFilter</filter-class>
-        <init-param>
-            <param-name>encoding</param-name>
-            <param-value>UTF-8</param-value>
-        </init-param>
-        <init-param>
-            <param-name>ignore</param-name>
-            <param-value>false</param-value>
-        </init-param>
+        <filter-name>AutenticacaoFilter</filter-name>
+        <filter-class>filter.AutenticacaoFilter</filter-class>
     </filter>
 
     <filter-mapping>
-        <filter-name>encodingFilter</filter-name>
-        <url-pattern>/*</url-pattern>
+        <filter-name>AutenticacaoFilter</filter-name>
+        <url-pattern>/ImpressoraController</url-pattern>
     </filter-mapping>
 
-    <!-- Timeout da sessão (em minutos) -->
-    <session-config>
-        <session-timeout>30</session-timeout>
-    </session-config>
+    <filter-mapping>
+        <filter-name>AutenticacaoFilter</filter-name>
+        <url-pattern>/UsuarioController</url-pattern>
+    </filter-mapping>
+
+    <filter-mapping>
+        <filter-name>AutenticacaoFilter</filter-name>
+        <url-pattern>/ExportarCsvServlet</url-pattern>
+    </filter-mapping>
+
+    <filter-mapping>
+        <filter-name>AutenticacaoFilter</filter-name>
+        <url-pattern>/ExportarExcelServlet</url-pattern>
+    </filter-mapping>
+
+    <!-- Filtro de permissões (páginas específicas) -->
+    <filter>
+        <filter-name>PermissaoFilter</filter-name>
+        <filter-class>filter.PermissaoFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>PermissaoFilter</filter-name>
+        <url-pattern>/pages/cadastroImpressora.jsp</url-pattern>
+    </filter-mapping>
+
+    <filter-mapping>
+        <filter-name>PermissaoFilter</filter-name>
+        <url-pattern>/pages/listaUsuarios.jsp</url-pattern>
+    </filter-mapping>
+
+    <filter-mapping>
+        <filter-name>PermissaoFilter</filter-name>
+        <url-pattern>/pages/cadastroUsuario.jsp</url-pattern>
+    </filter-mapping>
 
 </web-app>
