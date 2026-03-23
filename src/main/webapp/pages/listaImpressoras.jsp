@@ -349,6 +349,10 @@
                            class="btn btn-info" target="_blank">
                             <i class="bi bi-printer"></i> Imprimir
                         </a>
+                        <a href="ImpressoraController?action=relatorioImpressaoOculto&secretaria=<%= secretariaSelecionada %>" 
+   class="btn btn-warning" target="_blank">
+    <i class="bi bi-printer"></i> Imprimir (Ocult.)
+</a>
                     </div>
                 </div>
             </div>
@@ -394,7 +398,8 @@
                                     <th>Contador Atual</th>
                                     <th>Impressões/Mês</th>
                                     <th>Custo Mensal</th>
-                                    <th>Último Relatório</th>
+                                    <th>Rel. Atualizado</th>
+									<th>Rel. Anterior</th>
                                     <th>Status</th>
                                     <th class="text-center">Ações</th>
                                 </tr>
@@ -431,14 +436,22 @@
                                                 <span class="text-muted">R$ 0,00</span>
                                             <% } %>
                                         </td>
-                                        <td>
-                                            <% if (imp.getDataUltimaManutencao() != null) { %>
-                                                <i class="bi bi-calendar-check text-success"></i>
-                                                <%= imp.getDataUltimaManutencao().format(formatter) %>
-                                            <% } else { %>
-                                                <span class="text-muted">-</span>
-                                            <% } %>
-                                        </td>
+<td>
+    <% if (imp.getDataUltimaManutencao() != null) { %>
+        <i class="bi bi-calendar-check text-success"></i>
+        <%= imp.getDataUltimaManutencao().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) %>
+    <% } else { %>
+        <span class="text-muted">-</span>
+    <% } %>
+</td>
+<td>
+    <% if (imp.getDataRelatorioAnterior() != null) { %>
+        <i class="bi bi-calendar-minus text-secondary"></i>
+        <%= imp.getDataRelatorioAnterior().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) %>
+    <% } else { %>
+        <span class="text-muted">-</span>
+    <% } %>
+</td>
                                         <td>
                                             <% if ("Operante".equals(imp.getStatus())) { %>
                                                 <span class="badge badge-operante">

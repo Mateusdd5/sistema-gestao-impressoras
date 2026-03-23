@@ -31,38 +31,41 @@ public class ImpressoraDAO {
             BigDecimal custo = Impressora.detectarCustoPorModelo(impressora.getModeloEquipamento());
             impressora.setCustoPorImpressao(custo);
         }
-        
+
         String sql = "INSERT INTO impressora (local_instalacao, modelo_equipamento, custo_por_impressao, " +
                      "numero_serie, contador_impressoes, contador_anterior, data_ultima_manutencao, " +
-                     "secretaria, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     "data_relatorio_anterior, secretaria, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, impressora.getLocalInstalacao());
             stmt.setString(2, impressora.getModeloEquipamento());
-            
+
             if (impressora.getCustoPorImpressao() != null) {
                 stmt.setBigDecimal(3, impressora.getCustoPorImpressao());
             } else {
                 stmt.setNull(3, java.sql.Types.DECIMAL);
             }
-            
+
             stmt.setString(4, impressora.getNumeroSerie());
             stmt.setInt(5, impressora.getContadorImpressoes());
-            
+
             if (impressora.getContadorAnterior() != null) {
                 stmt.setInt(6, impressora.getContadorAnterior());
             } else {
                 stmt.setNull(6, java.sql.Types.INTEGER);
             }
-            
+
             if (impressora.getDataUltimaManutencao() != null) {
                 stmt.setDate(7, Date.valueOf(impressora.getDataUltimaManutencao()));
             } else {
                 stmt.setNull(7, java.sql.Types.DATE);
             }
-            
-            stmt.setString(8, impressora.getSecretaria());
-            stmt.setString(9, impressora.getStatus());
+
+            // data_relatorio_anterior sempre null no cadastro inicial
+            stmt.setNull(8, java.sql.Types.DATE);
+
+            stmt.setString(9, impressora.getSecretaria());
+            stmt.setString(10, impressora.getStatus());
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
@@ -176,40 +179,57 @@ public class ImpressoraDAO {
     }
 
     /**
-     * Atualiza os dados de uma impressora
-     * IMPORTANTE: Salva o contador atual como contador_anterior antes de atualizar
+     * Atualiza os dados de uma impressora.
+     * - Se o contador mudar, salva o antigo em contador_anterior.
+     * - Se a data do relatório atualizado mudar, salva a antiga em data_relatorio_anterior.
      */
     public void atualizarImpressora(Impressora impressora) throws SQLException {
-        // Primeiro, busca o contador atual para salvar como anterior
+        // Busca estado atual no banco
         Impressora impressoraAtual = buscarPorId(impressora.getId());
-        
+
         // Detectar custo automaticamente se mudou o modelo
-        if (impressora.getCustoPorImpressao() == null || 
+        if (impressora.getCustoPorImpressao() == null ||
             (impressoraAtual != null && !impressora.getModeloEquipamento().equals(impressoraAtual.getModeloEquipamento()))) {
             BigDecimal custo = Impressora.detectarCustoPorModelo(impressora.getModeloEquipamento());
             impressora.setCustoPorImpressao(custo);
         }
-        
+
+        // Lógica de rotação da data do relatório
+        // Só rotaciona automaticamente se o usuário NÃO informou valor manual para o anterior
+        if (impressora.getDataRelatorioAnterior() == null && impressoraAtual != null) {
+            LocalDate dataAtualNoBanco = impressoraAtual.getDataUltimaManutencao();
+            LocalDate dataNovaInformada = impressora.getDataUltimaManutencao();
+
+            if (dataAtualNoBanco != null && dataNovaInformada != null
+                    && !dataNovaInformada.equals(dataAtualNoBanco)) {
+                // Data mudou → move a antiga para relatório anterior automaticamente
+                impressora.setDataRelatorioAnterior(dataAtualNoBanco);
+            } else {
+                // Data não mudou → preserva o relatório anterior existente
+                impressora.setDataRelatorioAnterior(impressoraAtual.getDataRelatorioAnterior());
+            }
+        }
+
         String sql = "UPDATE impressora SET local_instalacao = ?, modelo_equipamento = ?, " +
                      "custo_por_impressao = ?, numero_serie = ?, contador_impressoes = ?, " +
-                     "contador_anterior = ?, data_ultima_manutencao = ?, secretaria = ?, status = ? " +
-                     "WHERE id = ?";
+                     "contador_anterior = ?, data_ultima_manutencao = ?, data_relatorio_anterior = ?, " +
+                     "secretaria = ?, status = ? WHERE id = ?";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setString(1, impressora.getLocalInstalacao());
             stmt.setString(2, impressora.getModeloEquipamento());
-            
+
             if (impressora.getCustoPorImpressao() != null) {
                 stmt.setBigDecimal(3, impressora.getCustoPorImpressao());
             } else {
                 stmt.setNull(3, java.sql.Types.DECIMAL);
             }
-            
+
             stmt.setString(4, impressora.getNumeroSerie());
             stmt.setInt(5, impressora.getContadorImpressoes());
-            
-            // Se o contador foi atualizado, salva o valor anterior
-            if (impressoraAtual != null && 
+
+            // Rotação do contador: se mudou, salva o anterior
+            if (impressoraAtual != null &&
                 !impressora.getContadorImpressoes().equals(impressoraAtual.getContadorImpressoes())) {
                 stmt.setInt(6, impressoraAtual.getContadorImpressoes());
             } else if (impressora.getContadorAnterior() != null) {
@@ -217,16 +237,22 @@ public class ImpressoraDAO {
             } else {
                 stmt.setNull(6, java.sql.Types.INTEGER);
             }
-            
+
             if (impressora.getDataUltimaManutencao() != null) {
                 stmt.setDate(7, Date.valueOf(impressora.getDataUltimaManutencao()));
             } else {
                 stmt.setNull(7, java.sql.Types.DATE);
             }
-            
-            stmt.setString(8, impressora.getSecretaria());
-            stmt.setString(9, impressora.getStatus());
-            stmt.setInt(10, impressora.getId());
+
+            if (impressora.getDataRelatorioAnterior() != null) {
+                stmt.setDate(8, Date.valueOf(impressora.getDataRelatorioAnterior()));
+            } else {
+                stmt.setNull(8, java.sql.Types.DATE);
+            }
+
+            stmt.setString(9, impressora.getSecretaria());
+            stmt.setString(10, impressora.getStatus());
+            stmt.setInt(11, impressora.getId());
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
@@ -306,65 +332,7 @@ public class ImpressoraDAO {
     }
 
     /**
-     * NOVO - Calcula custo total mensal por secretaria
-     */
-    public Map<String, BigDecimal> calcularCustoMensalPorSecretaria() throws SQLException {
-        Map<String, BigDecimal> custos = new HashMap<>();
-        
-        String sql = "SELECT secretaria, " +
-                     "SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
-                     "FROM impressora " +
-                     "GROUP BY secretaria " +
-                     "ORDER BY secretaria";
-
-        try (PreparedStatement stmt = conexao.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                String secretaria = rs.getString("secretaria");
-                BigDecimal custoTotal = rs.getBigDecimal("custo_total");
-                if (custoTotal == null) {
-                    custoTotal = BigDecimal.ZERO;
-                }
-                custos.put(secretaria, custoTotal);
-            }
-        } catch (SQLException e) {
-            throw new SQLException("Erro ao calcular custo mensal por secretaria: " + e.getMessage(), e);
-        }
-
-        return custos;
-    }
-
-    /**
-     * NOVO - Calcula custo total mensal de uma secretaria específica
-     */
-    public BigDecimal calcularCustoMensalSecretaria(String secretaria) throws SQLException {
-        BigDecimal custoTotal = BigDecimal.ZERO;
-        
-        String sql = "SELECT SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
-                     "FROM impressora " +
-                     "WHERE secretaria = ?";
-
-        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setString(1, secretaria);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    custoTotal = rs.getBigDecimal("custo_total");
-                    if (custoTotal == null) {
-                        custoTotal = BigDecimal.ZERO;
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            throw new SQLException("Erro ao calcular custo mensal da secretaria: " + e.getMessage(), e);
-        }
-
-        return custoTotal;
-    }
-
-    /**
-     * Busca impressoras com filtro genérico
+     * Busca impressoras com filtro textual
      */
     public List<Impressora> buscarImpressorasPorFiltro(String filtro) throws Exception {
         List<Impressora> lista = new ArrayList<>();
@@ -426,34 +394,96 @@ public class ImpressoraDAO {
     }
 
     /**
+     * Calcula custo total mensal por secretaria
+     */
+    public Map<String, BigDecimal> calcularCustoMensalPorSecretaria() throws SQLException {
+        Map<String, BigDecimal> custos = new HashMap<>();
+
+        String sql = "SELECT secretaria, " +
+                     "SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
+                     "FROM impressora " +
+                     "GROUP BY secretaria " +
+                     "ORDER BY secretaria";
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                String secretaria = rs.getString("secretaria");
+                BigDecimal custoTotal = rs.getBigDecimal("custo_total");
+                if (custoTotal == null) {
+                    custoTotal = BigDecimal.ZERO;
+                }
+                custos.put(secretaria, custoTotal);
+            }
+        } catch (SQLException e) {
+            throw new SQLException("Erro ao calcular custo mensal por secretaria: " + e.getMessage(), e);
+        }
+
+        return custos;
+    }
+
+    /**
+     * Calcula custo total mensal de uma secretaria específica
+     */
+    public BigDecimal calcularCustoMensalSecretaria(String secretaria) throws SQLException {
+        BigDecimal custoTotal = BigDecimal.ZERO;
+
+        String sql = "SELECT SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
+                     "FROM impressora WHERE secretaria = ?";
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, secretaria);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    BigDecimal resultado = rs.getBigDecimal("custo_total");
+                    if (resultado != null) {
+                        custoTotal = resultado;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new SQLException("Erro ao calcular custo mensal da secretaria: " + e.getMessage(), e);
+        }
+
+        return custoTotal;
+    }
+
+    /**
      * Método auxiliar para extrair uma Impressora do ResultSet
      */
     private Impressora extrairImpressoraDoResultSet(ResultSet rs) throws SQLException {
         Integer id = rs.getInt("id");
         String localInstalacao = rs.getString("local_instalacao");
         String modeloEquipamento = rs.getString("modelo_equipamento");
-        
+
         BigDecimal custoPorImpressao = rs.getBigDecimal("custo_por_impressao");
         if (rs.wasNull()) {
             custoPorImpressao = null;
         }
-        
+
         String numeroSerie = rs.getString("numero_serie");
         Integer contadorImpressoes = rs.getInt("contador_impressoes");
-        
+
         Integer contadorAnterior = rs.getInt("contador_anterior");
         if (rs.wasNull()) {
             contadorAnterior = null;
         }
-        
+
         Date dataManutencao = rs.getDate("data_ultima_manutencao");
         LocalDate dataUltimaManutencao = (dataManutencao != null) ? dataManutencao.toLocalDate() : null;
-        
+
+        Date dataRelAnterior = rs.getDate("data_relatorio_anterior");
+        LocalDate dataRelatorioAnterior = (dataRelAnterior != null) ? dataRelAnterior.toLocalDate() : null;
+
         String secretaria = rs.getString("secretaria");
         String status = rs.getString("status");
 
-        return new Impressora(id, localInstalacao, modeloEquipamento, custoPorImpressao, 
-                             numeroSerie, contadorImpressoes, contadorAnterior, 
+        Impressora impressora = new Impressora(id, localInstalacao, modeloEquipamento, custoPorImpressao,
+                             numeroSerie, contadorImpressoes, contadorAnterior,
                              dataUltimaManutencao, secretaria, status);
+        impressora.setDataRelatorioAnterior(dataRelatorioAnterior);
+        return impressora;
     }
 }

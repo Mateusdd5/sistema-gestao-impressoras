@@ -10,9 +10,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= request.getAttribute("impressora") != null ? "Editar Impressora" : "Cadastrar Impressora" %></title>
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Ícones -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body {
@@ -126,36 +124,32 @@
 </head>
 <body>
 <%
-    // Obter usuário logado
     Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
-    
+
     Impressora impressora = (Impressora) request.getAttribute("impressora");
     boolean isEdicao = impressora != null;
-    
+
     @SuppressWarnings("unchecked")
     List<String> listaSecretarias = (List<String>) request.getAttribute("listaSecretarias");
-    
+
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    
-    // Definir permissões
-    boolean podeEditarCadastrais = usuarioLogado.podeEditarDadosCadastrais(); // TECHNICIAN ou ADMIN
-    boolean podeEditarContadores = usuarioLogado.podeEditarContadores(); // OPERATOR, TECHNICIAN ou ADMIN
-    boolean podeCadastrar = usuarioLogado.podeCadastrar(); // TECHNICIAN ou ADMIN
-    
-    // Se está editando, verificar permissões
+    DateTimeFormatter formatterExibicao = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    boolean podeEditarCadastrais = usuarioLogado.podeEditarDadosCadastrais();
+    boolean podeEditarContadores = usuarioLogado.podeEditarContadores();
+    boolean podeCadastrar = usuarioLogado.podeCadastrar();
+
     if (isEdicao && !podeEditarContadores) {
         response.sendRedirect(request.getContextPath() + "/pages/acessoNegado.jsp");
         return;
     }
-    
-    // Se está cadastrando, precisa ser TECHNICIAN ou ADMIN
+
     if (!isEdicao && !podeCadastrar) {
         response.sendRedirect(request.getContextPath() + "/pages/acessoNegado.jsp");
         return;
     }
 %>
 
-<!-- Navbar de usuário -->
 <div class="container-fluid" style="max-width: 1200px; padding: 0 20px;">
     <div class="user-navbar">
         <div class="user-info">
@@ -197,13 +191,12 @@
             </h4>
         </div>
         <div class="card-body p-4">
-            
-            <!-- Aviso de permissões para OPERATOR -->
+
             <% if (isEdicao && podeEditarContadores && !podeEditarCadastrais) { %>
                 <div class="alert alert-warning">
                     <i class="bi bi-info-circle"></i>
                     <strong>Atenção:</strong> Como <strong>Operador</strong>, você pode editar apenas:
-                    <strong>Contadores, Status e Data do Último Relatório</strong>.
+                    <strong>Contadores, Status e Datas de Relatório</strong>.
                     Os demais campos estão bloqueados.
                 </div>
             <% } %>
@@ -224,17 +217,15 @@
                             <% } %>
                         </label>
                         <% if (isEdicao && !podeEditarCadastrais) { %>
-                            <!-- OPERATOR: campo bloqueado -->
-                            <input type="text" class="form-control field-readonly" 
+                            <input type="text" class="form-control field-readonly"
                                    value="<%= impressora.getSecretaria() %>" disabled>
                             <input type="hidden" name="secretaria" value="<%= impressora.getSecretaria() %>">
                         <% } else { %>
-                            <!-- TECHNICIAN/ADMIN: campo editável -->
                             <select class="form-select" id="secretaria" name="secretaria" required>
                                 <option value="">Selecione uma secretaria</option>
                                 <% if (listaSecretarias != null) {
                                     for (String sec : listaSecretarias) { %>
-                                        <option value="<%= sec %>" 
+                                        <option value="<%= sec %>"
                                                 <%= isEdicao && sec.equals(impressora.getSecretaria()) ? "selected" : "" %>>
                                             <%= sec %>
                                         </option>
@@ -271,14 +262,12 @@
                             <% } %>
                         </label>
                         <% if (isEdicao && !podeEditarCadastrais) { %>
-                            <!-- OPERATOR: campo bloqueado -->
-                            <input type="text" class="form-control field-readonly" 
+                            <input type="text" class="form-control field-readonly"
                                    value="<%= impressora.getLocalInstalacao() %>" disabled>
                             <input type="hidden" name="localInstalacao" value="<%= impressora.getLocalInstalacao() %>">
                         <% } else { %>
-                            <!-- TECHNICIAN/ADMIN: campo editável -->
-                            <input type="text" class="form-control" id="localInstalacao" name="localInstalacao" 
-                                   value="<%= isEdicao ? impressora.getLocalInstalacao() : "" %>" 
+                            <input type="text" class="form-control" id="localInstalacao" name="localInstalacao"
+                                   value="<%= isEdicao ? impressora.getLocalInstalacao() : "" %>"
                                    placeholder="Ex: Sala 101" required>
                         <% } %>
                     </div>
@@ -292,14 +281,12 @@
                             <% } %>
                         </label>
                         <% if (isEdicao && !podeEditarCadastrais) { %>
-                            <!-- OPERATOR: campo bloqueado -->
-                            <input type="text" class="form-control field-readonly" 
+                            <input type="text" class="form-control field-readonly"
                                    value="<%= impressora.getModeloEquipamento() %>" disabled>
                             <input type="hidden" name="modeloEquipamento" value="<%= impressora.getModeloEquipamento() %>">
                         <% } else { %>
-                            <!-- TECHNICIAN/ADMIN: campo editável -->
-                            <input type="text" class="form-control" id="modeloEquipamento" name="modeloEquipamento" 
-                                   value="<%= isEdicao ? impressora.getModeloEquipamento() : "" %>" 
+                            <input type="text" class="form-control" id="modeloEquipamento" name="modeloEquipamento"
+                                   value="<%= isEdicao ? impressora.getModeloEquipamento() : "" %>"
                                    placeholder="Ex: Kyocera M-2040DN" required>
                             <small class="text-muted">
                                 O custo por impressão será detectado automaticamente
@@ -316,14 +303,12 @@
                             <span class="permission-badge badge-readonly">Não pode ser alterado</span>
                         </label>
                         <% if (isEdicao) { %>
-                            <!-- EDIÇÃO: número de série NUNCA pode ser alterado -->
-                            <input type="text" class="form-control field-readonly" 
+                            <input type="text" class="form-control field-readonly"
                                    value="<%= impressora.getNumeroSerie() %>" disabled>
                             <input type="hidden" name="numeroSerie" value="<%= impressora.getNumeroSerie() %>">
                             <small class="text-muted">Número de série não pode ser alterado</small>
                         <% } else { %>
-                            <!-- CADASTRO: campo editável -->
-                            <input type="text" class="form-control" id="numeroSerie" name="numeroSerie" 
+                            <input type="text" class="form-control" id="numeroSerie" name="numeroSerie"
                                    placeholder="Ex: ABC123XYZ456" required>
                         <% } %>
                     </div>
@@ -336,8 +321,8 @@
                             <i class="bi bi-123"></i> Contador de Impressões Atual *
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-                        <input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes" 
-                               value="<%= isEdicao ? impressora.getContadorImpressoes() : "0" %>" 
+                        <input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes"
+                               value="<%= isEdicao ? impressora.getContadorImpressoes() : "0" %>"
                                min="0" required>
                     </div>
 
@@ -347,8 +332,8 @@
                             <i class="bi bi-clock-history"></i> Contador do Mês Anterior
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-                        <input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior" 
-                               value="<%= isEdicao && impressora.getContadorAnterior() != null ? impressora.getContadorAnterior() : "" %>" 
+                        <input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior"
+                               value="<%= isEdicao && impressora.getContadorAnterior() != null ? impressora.getContadorAnterior() : "" %>"
                                min="0" placeholder="0">
                         <small class="text-muted">
                             💡 Edite este valor se precisar corrigir o cálculo de impressões do mês. Deixe vazio para atualizar automaticamente.
@@ -357,29 +342,44 @@
                 </div>
 
                 <div class="row">
-                    <!-- Data do Último Relatório -->
+                    <!-- Relatório Atualizado -->
                     <div class="col-md-6 mb-3">
                         <label for="dataUltimaManutencao" class="form-label">
-                            <i class="bi bi-calendar-check"></i> Data do Último Relatório
+                            <i class="bi bi-calendar-check"></i> Relatório Atualizado
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-                        <input type="date" class="form-control" id="dataUltimaManutencao" name="dataUltimaManutencao" 
+                        <input type="date" class="form-control" id="dataUltimaManutencao" name="dataUltimaManutencao"
                                value="<%= isEdicao && impressora.getDataUltimaManutencao() != null ? impressora.getDataUltimaManutencao().format(formatter) : "" %>">
-                        <small class="text-muted">Opcional</small>
+                        <small class="text-muted">Opcional — ao alterar, a data anterior será preservada automaticamente</small>
                     </div>
 
-                    <!-- Informações de Custo (somente visualização) -->
-                    <% if (isEdicao && impressora.getCustoPorImpressao() != null) { %>
+                    <!-- Relatório Anterior (somente leitura) -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-calendar-minus"></i> Relatório Anterior
+                            <span class="permission-badge badge-editable">Editável</span>
+                        </label>
+<input type="date" class="form-control" id="dataRelatorioAnterior" name="dataRelatorioAnterior"
+       value="<%= isEdicao && impressora.getDataRelatorioAnterior() != null ? impressora.getDataRelatorioAnterior().format(formatter) : "" %>">
+<small class="text-muted">
+    💡 Preenchido automaticamente ao alterar "Relatório Atualizado". Edite manualmente se precisar corrigir.
+</small>
+                    </div>
+                </div>
+
+                <!-- Custo por Impressão (somente visualização na edição) -->
+                <% if (isEdicao && impressora.getCustoPorImpressao() != null) { %>
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-cash"></i> Custo por Impressão (automático)
                             </label>
-                            <input type="text" class="form-control field-readonly" 
-                                   value="R$ <%= String.format("%.2f", impressora.getCustoPorImpressao()) %>" disabled>
+                            <input type="text" class="form-control field-readonly"
+                                   value="R$ <%= String.format("%.2f", impressora.getCustoPorImpressao()).replace(".", ",") %>" disabled>
                             <small class="text-muted">Detectado automaticamente pelo modelo</small>
                         </div>
-                    <% } %>
-                </div>
+                    </div>
+                <% } %>
 
                 <hr class="my-4">
 
@@ -397,7 +397,6 @@
     </div>
 </div>
 
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
