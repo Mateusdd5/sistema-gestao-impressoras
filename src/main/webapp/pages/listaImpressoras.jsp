@@ -13,18 +13,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Impressoras</title>
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Ícones -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px 0;
-        }
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px 0 0 0;
+}
 
-        /* Navbar de usuário */
         .user-navbar {
             background: white;
             border-radius: 15px;
@@ -78,7 +75,6 @@
             padding: 0 20px;
         }
 
-        /* Sidebar de Secretarias */
         .sidebar {
             width: 280px;
             flex-shrink: 0;
@@ -91,6 +87,8 @@
             padding: 20px;
             position: sticky;
             top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
         }
 
         .sidebar-card h5 {
@@ -132,7 +130,6 @@
             margin-right: 8px;
         }
 
-        /* Conteúdo Principal */
         .content {
             flex: 1;
             min-width: 0;
@@ -155,9 +152,11 @@
             border-radius: 10px;
         }
 
-        .table-container {
-            overflow-x: auto;
-        }
+.table-container {
+    overflow-x: scroll;
+    overflow-y: auto;
+    max-height: calc(100vh - 280px);
+}
 
         .table {
             margin-bottom: 0;
@@ -250,23 +249,23 @@
 <%
     // Obter usuário logado
     Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
-    
+
     @SuppressWarnings("unchecked")
     List<Impressora> listaImpressoras = (List<Impressora>) request.getAttribute("listaImpressoras");
-    
+
     @SuppressWarnings("unchecked")
     List<String> listaSecretarias = (List<String>) request.getAttribute("listaSecretarias");
-    
+
     Integer totalResultados = (Integer) request.getAttribute("totalResultados");
     Boolean temFiltro = (Boolean) request.getAttribute("temFiltro");
     String filtroAtual = (String) request.getAttribute("filtroAtual");
     String secretariaSelecionada = (String) request.getAttribute("secretariaSelecionada");
-    
+
     if (totalResultados == null) totalResultados = 0;
     if (temFiltro == null) temFiltro = false;
     if (filtroAtual == null) filtroAtual = "";
     if (secretariaSelecionada == null) secretariaSelecionada = "TODAS";
-    
+
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
 %>
@@ -304,18 +303,18 @@
     <div class="sidebar">
         <div class="sidebar-card">
             <h5><i class="bi bi-funnel"></i> Filtrar por Secretaria</h5>
-            
+
             <form action="ImpressoraController" method="get">
                 <input type="hidden" name="action" value="filtrarSecretaria">
-                
-                <button type="submit" name="secretaria" value="TODAS" 
+
+                <button type="submit" name="secretaria" value="TODAS"
                         class="secretaria-btn <%= "TODAS".equals(secretariaSelecionada) ? "active" : "" %>">
                     <i class="bi bi-grid"></i> TODAS AS SECRETARIAS
                 </button>
-                
+
                 <% if (listaSecretarias != null && !listaSecretarias.isEmpty()) {
                     for (String sec : listaSecretarias) { %>
-                        <button type="submit" name="secretaria" value="<%= sec %>" 
+                        <button type="submit" name="secretaria" value="<%= sec %>"
                                 class="secretaria-btn <%= sec.equals(secretariaSelecionada) ? "active" : "" %>">
                             <i class="bi bi-building"></i> <%= sec %>
                         </button>
@@ -345,14 +344,14 @@
                         <a href="ExportarExcelServlet" class="btn btn-success">
                             <i class="bi bi-file-earmark-excel"></i> Exportar Excel
                         </a>
-                        <a href="ImpressoraController?action=relatorioImpressao&secretaria=<%= secretariaSelecionada %>" 
+                        <a href="ImpressoraController?action=relatorioImpressao&secretaria=<%= secretariaSelecionada %>"
                            class="btn btn-info" target="_blank">
                             <i class="bi bi-printer"></i> Imprimir
                         </a>
-                        <a href="ImpressoraController?action=relatorioImpressaoOculto&secretaria=<%= secretariaSelecionada %>" 
-   class="btn btn-warning" target="_blank">
-    <i class="bi bi-printer"></i> Imprimir (Ocult.)
-</a>
+                        <a href="ImpressoraController?action=relatorioImpressaoOculto&secretaria=<%= secretariaSelecionada %>"
+                           class="btn btn-warning" target="_blank">
+                            <i class="bi bi-printer"></i> Imprimir (Ocult.)
+                        </a>
                     </div>
                 </div>
             </div>
@@ -362,8 +361,8 @@
                     <div class="col-md-8">
                         <form action="ImpressoraController" method="get" class="d-flex gap-2">
                             <input type="hidden" name="action" value="buscar">
-                            <input type="text" class="form-control search-box" name="filtro" 
-                                   placeholder="🔍 Buscar por local, modelo, número de série..." 
+                            <input type="text" class="form-control search-box" name="filtro"
+                                   placeholder="🔍 Buscar por local, modelo, número de série..."
                                    value="<%= filtroAtual %>">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-search"></i> Buscar
@@ -399,7 +398,7 @@
                                     <th>Impressões/Mês</th>
                                     <th>Custo Mensal</th>
                                     <th>Rel. Atualizado</th>
-									<th>Rel. Anterior</th>
+                                    <th>Rel. Anterior</th>
                                     <th>Status</th>
                                     <th class="text-center">Ações</th>
                                 </tr>
@@ -436,22 +435,22 @@
                                                 <span class="text-muted">R$ 0,00</span>
                                             <% } %>
                                         </td>
-<td>
-    <% if (imp.getDataUltimaManutencao() != null) { %>
-        <i class="bi bi-calendar-check text-success"></i>
-        <%= imp.getDataUltimaManutencao().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) %>
-    <% } else { %>
-        <span class="text-muted">-</span>
-    <% } %>
-</td>
-<td>
-    <% if (imp.getDataRelatorioAnterior() != null) { %>
-        <i class="bi bi-calendar-minus text-secondary"></i>
-        <%= imp.getDataRelatorioAnterior().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) %>
-    <% } else { %>
-        <span class="text-muted">-</span>
-    <% } %>
-</td>
+                                        <td style="white-space: nowrap;">
+                                            <% if (imp.getDataUltimaManutencao() != null) { %>
+                                                <i class="bi bi-calendar-check text-success"></i>
+                                                <%= imp.getDataUltimaManutencao().format(formatter) %>
+                                            <% } else { %>
+                                                <span class="text-muted">-</span>
+                                            <% } %>
+                                        </td>
+                                        <td style="white-space: nowrap;">
+                                            <% if (imp.getDataRelatorioAnterior() != null) { %>
+                                                <i class="bi bi-calendar-minus text-secondary"></i>
+                                                <%= imp.getDataRelatorioAnterior().format(formatter) %>
+                                            <% } else { %>
+                                                <span class="text-muted">-</span>
+                                            <% } %>
+                                        </td>
                                         <td>
                                             <% if ("Operante".equals(imp.getStatus())) { %>
                                                 <span class="badge badge-operante">
@@ -465,14 +464,14 @@
                                         </td>
                                         <td class="text-center action-buttons">
                                             <% if (usuarioLogado.podeEditarContadores()) { %>
-                                                <a href="ImpressoraController?action=editar&id=<%= imp.getId() %>" 
+                                                <a href="ImpressoraController?action=editar&id=<%= imp.getId() %>"
                                                    class="btn btn-sm btn-warning" title="Editar">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                             <% } %>
                                             <% if (usuarioLogado.podeDeletar()) { %>
-                                                <button type="button" class="btn btn-sm btn-danger" 
-                                                        onclick="confirmarExclusao(<%= imp.getId() %>, '<%= imp.getModeloEquipamento() %>')" 
+                                                <button type="button" class="btn btn-sm btn-danger"
+                                                        onclick="confirmarExclusao(<%= imp.getId() %>, '<%= imp.getModeloEquipamento() %>')"
                                                         title="Excluir">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
@@ -504,10 +503,28 @@
     </div>
 </div>
 
+<!-- Rodapé -->
+<footer style="
+    max-width: 100%;
+    margin: 0;
+    padding: 30px 20px 25px 20px;
+    text-align: center;
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.12));
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.85rem;
+">
+    <p style="margin: 0; font-weight: 600; letter-spacing: 0.5px;">
+        <i class="bi bi-printer-fill"></i>
+        Sistema de Controle de Impressoras
+    </p>
+    <p style="margin: 6px 0 0 0; opacity: 0.75;">
+        Prefeitura Municipal de Dias D'ávila &mdash; Tecnologia da Informação
+    </p>
+</footer>
+
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Scripts -->
 <script>
 function confirmarExclusao(id, modelo) {
     if (confirm('Tem certeza que deseja excluir a impressora "' + modelo + '"?')) {

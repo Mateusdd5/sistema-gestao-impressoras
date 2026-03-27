@@ -233,17 +233,6 @@
                         Entrar
                     </button>
                 </form>
-
-                <!-- Informações de teste -->
-                <div class="mt-4 p-3" style="background: #f8f9fa; border-radius: 10px; font-size: 0.85rem;">
-                    <strong><i class="bi bi-info-circle"></i> Usuários de teste:</strong><br>
-                    <small>
-                        • <strong>admin</strong> / admin123 (Administrador)<br>
-                        • <strong>tecnico</strong> / tecnico123 (Técnico)<br>
-                        • <strong>operador</strong> / operador123 (Operador)<br>
-                        • <strong>viewer</strong> / viewer123 (Visualizador)
-                    </small>
-                </div>
             </div>
 
             <!-- Rodapé -->
