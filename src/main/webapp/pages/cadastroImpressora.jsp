@@ -120,6 +120,43 @@
             background: #6c757d;
             color: white;
         }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-container:hover {
+            border-color: #667eea;
+        }
+
+        .toggle-container.ativo {
+            border-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .toggle-container.inativo {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+
+.form-check-input {
+    width: 2.5em;
+    height: 1.3em;
+    pointer-events: none;
+}
+
+        .form-check-input:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -148,6 +185,10 @@
         response.sendRedirect(request.getContextPath() + "/pages/acessoNegado.jsp");
         return;
     }
+
+    boolean incluirNoCalculoAtual = !isEdicao || (impressora.getIncluirNoCalculo() != null && impressora.getIncluirNoCalculo());
+    boolean isCanon = isEdicao && impressora.getModeloEquipamento() != null &&
+            impressora.getModeloEquipamento().toUpperCase().contains("CANON");
 %>
 
 <div class="container-fluid" style="max-width: 1200px; padding: 0 20px;">
@@ -321,9 +362,9 @@
                             <i class="bi bi-123"></i> Contador de Impressões Atual *
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-                        <input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes"
-                               value="<%= isEdicao ? impressora.getContadorImpressoes() : "0" %>"
-                               min="0" required>
+<input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes"
+       value="<%= isEdicao ? (isCanon ? impressora.getContadorImpressoes().toPlainString() : impressora.getContadorImpressoes().toBigInteger().toString()) : "0" %>"
+       min="0" step="<%= isCanon ? "0.01" : "1" %>" required>
                     </div>
 
                     <!-- Contador do Mês Anterior -->
@@ -332,9 +373,9 @@
                             <i class="bi bi-clock-history"></i> Contador do Mês Anterior
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-                        <input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior"
-                               value="<%= isEdicao && impressora.getContadorAnterior() != null ? impressora.getContadorAnterior() : "" %>"
-                               min="0" placeholder="0">
+<input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior"
+       value="<%= isEdicao && impressora.getContadorAnterior() != null ? (isCanon ? impressora.getContadorAnterior().toPlainString() : impressora.getContadorAnterior().toBigInteger().toString()) : "" %>"
+       min="0" step="<%= isCanon ? "0.01" : "1" %>" placeholder="0">
                         <small class="text-muted">
                             💡 Edite este valor se precisar corrigir o cálculo de impressões do mês. Deixe vazio para atualizar automaticamente.
                         </small>
@@ -353,23 +394,50 @@
                         <small class="text-muted">Opcional — ao alterar, a data anterior será preservada automaticamente</small>
                     </div>
 
-                    <!-- Relatório Anterior (somente leitura) -->
+                    <!-- Relatório Anterior -->
                     <div class="col-md-6 mb-3">
                         <label class="form-label">
                             <i class="bi bi-calendar-minus"></i> Relatório Anterior
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-<input type="date" class="form-control" id="dataRelatorioAnterior" name="dataRelatorioAnterior"
-       value="<%= isEdicao && impressora.getDataRelatorioAnterior() != null ? impressora.getDataRelatorioAnterior().format(formatter) : "" %>">
-<small class="text-muted">
-    💡 Preenchido automaticamente ao alterar "Relatório Atualizado". Edite manualmente se precisar corrigir.
-</small>
+                        <input type="date" class="form-control" id="dataRelatorioAnterior" name="dataRelatorioAnterior"
+                               value="<%= isEdicao && impressora.getDataRelatorioAnterior() != null ? impressora.getDataRelatorioAnterior().format(formatter) : "" %>">
+                        <small class="text-muted">
+                            💡 Preenchido automaticamente ao alterar "Relatório Atualizado". Edite manualmente se precisar corrigir.
+                        </small>
                     </div>
                 </div>
 
-                <!-- Custo por Impressão (somente visualização na edição) -->
-                <% if (isEdicao && impressora.getCustoPorImpressao() != null) { %>
-                    <div class="row">
+                <div class="row">
+                    <!-- Incluir no Cálculo de Custos -->
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            <i class="bi bi-calculator"></i> Incluir no Cálculo de Custos
+                            <span class="permission-badge badge-editable">Editável</span>
+                        </label>
+                        <div id="toggleContainer"
+                             class="toggle-container <%= incluirNoCalculoAtual ? "ativo" : "inativo" %>"
+                             onclick="alternarCalculo()">
+                            <input class="form-check-input" type="checkbox"
+                                   id="incluirNoCalculoCheck"
+                                   <%= incluirNoCalculoAtual ? "checked" : "" %>>
+                            <input type="hidden" name="incluirNoCalculo" id="incluirNoCalculoHidden"
+                                   value="<%= incluirNoCalculoAtual ? "true" : "false" %>">
+                            <div>
+                                <div id="toggleLabel" style="font-weight: 600; color: #495057;">
+                                    <%= incluirNoCalculoAtual ? "✅ Incluído no cálculo" : "⚠️ Excluído do cálculo" %>
+                                </div>
+                                <small class="text-muted" id="toggleDesc">
+                                    <%= incluirNoCalculoAtual
+                                        ? "A diferença de impressões desta impressora entrará no custo mensal"
+                                        : "Esta impressora não contribuirá para o custo mensal do relatório" %>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Custo por Impressão (somente visualização na edição) -->
+                    <% if (isEdicao && impressora.getCustoPorImpressao() != null) { %>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 <i class="bi bi-cash"></i> Custo por Impressão (automático)
@@ -378,8 +446,8 @@
                                    value="R$ <%= String.format("%.2f", impressora.getCustoPorImpressao()).replace(".", ",") %>" disabled>
                             <small class="text-muted">Detectado automaticamente pelo modelo</small>
                         </div>
-                    </div>
-                <% } %>
+                    <% } %>
+                </div>
 
                 <hr class="my-4">
 
@@ -397,6 +465,26 @@
     </div>
 </div>
 
+<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function alternarCalculo() {
+    const check = document.getElementById('incluirNoCalculoCheck');
+    const hidden = document.getElementById('incluirNoCalculoHidden');
+    const container = document.getElementById('toggleContainer');
+    const label = document.getElementById('toggleLabel');
+    const desc = document.getElementById('toggleDesc');
+
+    check.checked = !check.checked;
+    const ativo = check.checked;
+
+    hidden.value = ativo ? 'true' : 'false';
+    container.className = 'toggle-container ' + (ativo ? 'ativo' : 'inativo');
+    label.innerHTML = ativo ? '✅ Incluído no cálculo' : '⚠️ Excluído do cálculo';
+    desc.textContent = ativo
+        ? 'A diferença de impressões desta impressora entrará no custo mensal'
+        : 'Esta impressora não contribuirá para o custo mensal do relatório';
+}
+</script>
 </body>
 </html>

@@ -5,6 +5,7 @@
 <%@ page import="java.util.List" %>
 <%@ page import="java.time.format.DateTimeFormatter" %>
 <%@ page import="java.text.NumberFormat" %>
+<%@ page import="java.text.DecimalFormat" %>
 <%@ page import="java.util.Locale" %>
 <%@ page import="java.math.BigDecimal" %>
 <!DOCTYPE html>
@@ -195,6 +196,14 @@ body {
             color: #000;
         }
 
+        .badge-excluido {
+            background: #fd7e14;
+            color: white;
+            font-size: 10px;
+            padding: 3px 7px;
+            border-radius: 6px;
+        }
+
         .action-buttons .btn {
             padding: 5px 10px;
             font-size: 14px;
@@ -268,6 +277,7 @@ body {
 
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
+    DecimalFormat dfContador = new DecimalFormat("#,##0.##");
 %>
 
 <!-- Navbar de usuário -->
@@ -415,19 +425,21 @@ body {
                                         <td><%= imp.getModeloEquipamento() %></td>
                                         <td><small class="text-muted"><%= imp.getNumeroSerie() %></small></td>
                                         <td>
-                                            <strong><%= String.format("%,d", imp.getContadorImpressoes()) %></strong>
+                                            <strong><%= dfContador.format(imp.getContadorImpressoes()) %></strong>
                                         </td>
                                         <td>
-                                            <% if (imp.getContadorAnterior() != null && imp.getContadorAnterior() > 0) { %>
+                                            <% if (imp.getContadorAnterior() != null && imp.getContadorAnterior().compareTo(BigDecimal.ZERO) > 0) { %>
                                                 <span class="badge bg-info">
-                                                    <%= String.format("%,d", imp.getImpressoesDoMes()) %>
+                                                    <%= dfContador.format(imp.getImpressoesDoMes()) %>
                                                 </span>
                                             <% } else { %>
                                                 <span class="text-muted">-</span>
                                             <% } %>
                                         </td>
                                         <td>
-                                            <% if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes() > 0) { %>
+                                            <% if (imp.getIncluirNoCalculo() != null && !imp.getIncluirNoCalculo()) { %>
+                                                <span class="badge-excluido">excluído</span>
+                                            <% } else if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes().compareTo(BigDecimal.ZERO) > 0) { %>
                                                 <span class="custo-destaque">
                                                     <%= currencyFormat.format(imp.getCustoMensal()) %>
                                                 </span>

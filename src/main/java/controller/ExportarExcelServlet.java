@@ -128,7 +128,7 @@ public class ExportarExcelServlet extends HttpServlet {
             .collect(Collectors.groupingBy(Impressora::getSecretaria));
         
         int totalImpressoras = 0;
-        long totalImpressoesMes = 0;
+        BigDecimal totalImpressoesMes = BigDecimal.ZERO;
         BigDecimal custoTotalGeral = BigDecimal.ZERO;
         
         for (Map.Entry<String, List<Impressora>> entry : porSecretaria.entrySet()) {
@@ -148,12 +148,13 @@ public class ExportarExcelServlet extends HttpServlet {
             cell1.setCellValue(totalSec);
             cell1.setCellStyle(dataStyle);
             
-            // Impressões do mês
-            long impressoesSec = impressoras.stream()
-                .mapToInt(Impressora::getImpressoesDoMes)
-                .sum();
+            // Impressões do mês — só soma impressoras incluídas no cálculo
+            BigDecimal impressoesSec = impressoras.stream()
+                .filter(imp -> imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo())
+                .map(Impressora::getImpressoesDoMes)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
             Cell cell2 = dataRow.createCell(2);
-            cell2.setCellValue(impressoesSec);
+            cell2.setCellValue(impressoesSec.doubleValue());
             cell2.setCellStyle(dataStyle);
             
             // Custo mensal
@@ -163,7 +164,7 @@ public class ExportarExcelServlet extends HttpServlet {
             cell3.setCellStyle(currencyStyle);
             
             totalImpressoras += totalSec;
-            totalImpressoesMes += impressoesSec;
+            totalImpressoesMes = totalImpressoesMes.add(impressoesSec);
             custoTotalGeral = custoTotalGeral.add(custoSec);
         }
         
@@ -179,7 +180,7 @@ public class ExportarExcelServlet extends HttpServlet {
         totalCell1.setCellStyle(totalStyle);
         
         Cell totalCell2 = totalRow.createCell(2);
-        totalCell2.setCellValue(totalImpressoesMes);
+        totalCell2.setCellValue(totalImpressoesMes.doubleValue());
         totalCell2.setCellStyle(totalStyle);
         
         Cell totalCell3 = totalRow.createCell(3);
@@ -228,11 +229,12 @@ public class ExportarExcelServlet extends HttpServlet {
         }
         
         // Dados
-        long totalContador = 0;
-        long totalImpressoesMes = 0;
+        BigDecimal totalContador = BigDecimal.ZERO;
+        BigDecimal totalImpressoesMes = BigDecimal.ZERO;
         BigDecimal totalCustoMensal = BigDecimal.ZERO;
         
         for (Impressora imp : impressoras) {
+            boolean incluida = imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo();
             Row dataRow = sheet.createRow(rowNum++);
             
             // Local
@@ -250,14 +252,14 @@ public class ExportarExcelServlet extends HttpServlet {
             cell2.setCellValue(imp.getNumeroSerie());
             cell2.setCellStyle(dataStyle);
             
-            // Contador Atual
+            // Contador Atual — .doubleValue() pois setCellValue não aceita BigDecimal
             Cell cell3 = dataRow.createCell(3);
-            cell3.setCellValue(imp.getContadorImpressoes());
+            cell3.setCellValue(imp.getContadorImpressoes().doubleValue());
             cell3.setCellStyle(dataStyle);
             
-            // Impressões do Mês
+            // Impressões do Mês — zero se excluída do cálculo
             Cell cell4 = dataRow.createCell(4);
-            cell4.setCellValue(imp.getImpressoesDoMes());
+            cell4.setCellValue(incluida ? imp.getImpressoesDoMes().doubleValue() : 0);
             cell4.setCellStyle(dataStyle);
             
             // Custo por Página
@@ -290,9 +292,11 @@ public class ExportarExcelServlet extends HttpServlet {
             cell8.setCellValue(imp.getStatus());
             cell8.setCellStyle(dataStyle);
             
-            // Acumular totais
-            totalContador += imp.getContadorImpressoes();
-            totalImpressoesMes += imp.getImpressoesDoMes();
+            // Acumular totais com BigDecimal — impressões só se incluída
+            totalContador = totalContador.add(imp.getContadorImpressoes());
+            if (incluida) {
+                totalImpressoesMes = totalImpressoesMes.add(imp.getImpressoesDoMes());
+            }
             totalCustoMensal = totalCustoMensal.add(custoMensal);
         }
         
@@ -309,11 +313,11 @@ public class ExportarExcelServlet extends HttpServlet {
         }
         
         Cell totalCell3 = totalRow.createCell(3);
-        totalCell3.setCellValue(totalContador);
+        totalCell3.setCellValue(totalContador.doubleValue());
         totalCell3.setCellStyle(totalStyle);
         
         Cell totalCell4 = totalRow.createCell(4);
-        totalCell4.setCellValue(totalImpressoesMes);
+        totalCell4.setCellValue(totalImpressoesMes.doubleValue());
         totalCell4.setCellStyle(totalStyle);
         
         // Célula vazia custo/página

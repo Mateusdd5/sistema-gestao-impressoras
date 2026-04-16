@@ -204,7 +204,7 @@
     int totalImpressoras = (listaImpressoras != null) ? listaImpressoras.size() : 0;
     int totalOperantes = 0;
     int totalManutencao = 0;
-    long totalImpressoesMes = 0;
+    BigDecimal totalImpressoesMes = BigDecimal.ZERO;
     BigDecimal custoTotalGeral = BigDecimal.ZERO;
     
     if (listaImpressoras != null) {
@@ -214,10 +214,12 @@
             } else {
                 totalManutencao++;
             }
-            totalImpressoesMes += imp.getImpressoesDoMes();
-            
-            if (imp.getCustoPorImpressao() != null) {
-                custoTotalGeral = custoTotalGeral.add(imp.getCustoMensal());
+            // Só acumula impressões e custo se a impressora estiver incluída no cálculo
+            if (imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo()) {
+                totalImpressoesMes = totalImpressoesMes.add(imp.getImpressoesDoMes());
+                if (imp.getCustoPorImpressao() != null) {
+                    custoTotalGeral = custoTotalGeral.add(imp.getCustoMensal());
+                }
             }
         }
     }
@@ -280,7 +282,7 @@
             <div class="card text-center border-info">
                 <div class="card-body">
                     <h5 class="card-title text-info">Impressões do Mês</h5>
-                    <h2><%= String.format("%,d", totalImpressoesMes) %></h2>
+                    <h2><%= String.format("%,.0f", totalImpressoesMes) %></h2>
                 </div>
             </div>
         </div>
@@ -348,9 +350,15 @@
             <tbody>
                 <% 
                 BigDecimal custoTotalTabela = BigDecimal.ZERO;
-                for (Impressora imp : listaImpressoras) { 
-                    if (imp.getCustoPorImpressao() != null) {
+                BigDecimal totalImpressoesMesTabela = BigDecimal.ZERO;
+                for (Impressora imp : listaImpressoras) {
+                    boolean incluida = imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo();
+                    boolean isCanon = imp.getModeloEquipamento() != null && imp.getModeloEquipamento().toUpperCase().contains("CANON");
+                    if (incluida && imp.getCustoPorImpressao() != null) {
                         custoTotalTabela = custoTotalTabela.add(imp.getCustoMensal());
+                    }
+                    if (incluida) {
+                        totalImpressoesMesTabela = totalImpressoesMesTabela.add(imp.getImpressoesDoMes());
                     }
                 %>
                     <tr>
@@ -358,10 +366,12 @@
                         <td><%= imp.getLocalInstalacao() %></td>
                         <td><%= imp.getModeloEquipamento() %></td>
                         <td><small><%= imp.getNumeroSerie() %></small></td>
-                        <td class="text-end"><strong><%= String.format("%,d", imp.getContadorImpressoes()) %></strong></td>
+                        <td class="text-end"><strong><%= isCanon ? String.format("%,.2f", imp.getContadorImpressoes()) : String.format("%,.0f", imp.getContadorImpressoes()) %></strong></td>
                         <td class="text-end">
-                            <% if (imp.getContadorAnterior() != null && imp.getContadorAnterior() > 0) { %>
-                                <%= String.format("%,d", imp.getImpressoesDoMes()) %>
+                            <% if (!incluida) { %>
+                                <small class="text-muted">excluído</small>
+                            <% } else if (imp.getContadorAnterior() != null && imp.getContadorAnterior().compareTo(BigDecimal.ZERO) > 0) { %>
+                                <%= isCanon ? String.format("%,.2f", imp.getImpressoesDoMes()) : String.format("%,.0f", imp.getImpressoesDoMes()) %>
                             <% } else { %>
                                 -
                             <% } %>
@@ -374,7 +384,7 @@
                             <% } %>
                         </td>
                         <td class="text-end">
-                            <% if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes() > 0) { %>
+                            <% if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes().compareTo(BigDecimal.ZERO) > 0) { %>
                                 <strong class="custo-destaque"><%= currencyFormat.format(imp.getCustoMensal()) %></strong>
                             <% } else { %>
                                 R$ 0,00
@@ -401,11 +411,12 @@
                 <tr style="background: #f8f9fa; font-weight: bold;">
                     <td colspan="4" class="text-end">TOTAIS:</td>
                     <td class="text-end">
-                        <%= String.format("%,d", listaImpressoras.stream()
-                            .mapToInt(Impressora::getContadorImpressoes).sum()) %>
+<%= String.format("%,.0f", listaImpressoras.stream()
+    .map(Impressora::getContadorImpressoes)
+    .reduce(BigDecimal.ZERO, BigDecimal::add)) %>
                     </td>
                     <td class="text-end">
-                        <%= String.format("%,d", totalImpressoesMes) %>
+                        <%= String.format("%,.0f", totalImpressoesMesTabela) %>
                     </td>
                     <td colspan="1"></td>
                     <td class="text-end custo-destaque">

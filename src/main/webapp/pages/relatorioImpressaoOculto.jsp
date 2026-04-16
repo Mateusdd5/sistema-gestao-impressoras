@@ -3,6 +3,7 @@
 <%@ page import="java.util.List" %>
 <%@ page import="java.time.format.DateTimeFormatter" %>
 <%@ page import="java.time.LocalDate" %>
+<%@ page import="java.math.BigDecimal" %>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -245,16 +246,17 @@
             </thead>
             <tbody>
                 <%
-                int totalContador = 0;
+                BigDecimal totalContador = BigDecimal.ZERO;
                 for (Impressora imp : listaImpressoras) {
-                    totalContador += imp.getContadorImpressoes();
+                    totalContador = totalContador.add(imp.getContadorImpressoes());
+                    boolean isCanon = imp.getModeloEquipamento() != null && imp.getModeloEquipamento().toUpperCase().contains("CANON");
                 %>
                     <tr>
                         <td><strong><%= imp.getSecretaria() %></strong></td>
                         <td><%= imp.getLocalInstalacao() %></td>
                         <td><%= imp.getModeloEquipamento() %></td>
                         <td><small><%= imp.getNumeroSerie() %></small></td>
-                        <td class="text-end"><strong><%= String.format("%,d", imp.getContadorImpressoes()) %></strong></td>
+                        <td class="text-end"><strong><%= isCanon ? String.format("%,.2f", imp.getContadorImpressoes()) : String.format("%,.0f", imp.getContadorImpressoes()) %></strong></td>
                         <td class="text-center">
                             <% if (imp.getDataUltimaManutencao() != null) { %>
                                 <%= imp.getDataUltimaManutencao().format(formatter) %>
@@ -275,7 +277,7 @@
             <tfoot>
                 <tr style="background: #f8f9fa; font-weight: bold;">
                     <td colspan="4" class="text-end">TOTAIS:</td>
-                    <td class="text-end"><%= String.format("%,d", totalContador) %></td>
+                    <td class="text-end"><%= String.format("%,.0f", totalContador) %></td>
                     <td colspan="2"></td>
                 </tr>
             </tfoot>

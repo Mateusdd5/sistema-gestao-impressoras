@@ -34,7 +34,7 @@ public class ImpressoraDAO {
 
         String sql = "INSERT INTO impressora (local_instalacao, modelo_equipamento, custo_por_impressao, " +
                      "numero_serie, contador_impressoes, contador_anterior, data_ultima_manutencao, " +
-                     "data_relatorio_anterior, secretaria, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     "data_relatorio_anterior, secretaria, status, incluir_no_calculo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, impressora.getLocalInstalacao());
@@ -47,12 +47,12 @@ public class ImpressoraDAO {
             }
 
             stmt.setString(4, impressora.getNumeroSerie());
-            stmt.setInt(5, impressora.getContadorImpressoes());
+            stmt.setBigDecimal(5, impressora.getContadorImpressoes() != null ? impressora.getContadorImpressoes() : BigDecimal.ZERO);
 
             if (impressora.getContadorAnterior() != null) {
-                stmt.setInt(6, impressora.getContadorAnterior());
+                stmt.setBigDecimal(6, impressora.getContadorAnterior());
             } else {
-                stmt.setNull(6, java.sql.Types.INTEGER);
+                stmt.setNull(6, java.sql.Types.DECIMAL);
             }
 
             if (impressora.getDataUltimaManutencao() != null) {
@@ -66,6 +66,7 @@ public class ImpressoraDAO {
 
             stmt.setString(9, impressora.getSecretaria());
             stmt.setString(10, impressora.getStatus());
+            stmt.setBoolean(11, impressora.getIncluirNoCalculo() != null ? impressora.getIncluirNoCalculo() : true);
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
@@ -213,7 +214,7 @@ public class ImpressoraDAO {
         String sql = "UPDATE impressora SET local_instalacao = ?, modelo_equipamento = ?, " +
                      "custo_por_impressao = ?, numero_serie = ?, contador_impressoes = ?, " +
                      "contador_anterior = ?, data_ultima_manutencao = ?, data_relatorio_anterior = ?, " +
-                     "secretaria = ?, status = ? WHERE id = ?";
+                     "secretaria = ?, status = ?, incluir_no_calculo = ? WHERE id = ?";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setString(1, impressora.getLocalInstalacao());
@@ -226,16 +227,16 @@ public class ImpressoraDAO {
             }
 
             stmt.setString(4, impressora.getNumeroSerie());
-            stmt.setInt(5, impressora.getContadorImpressoes());
+            stmt.setBigDecimal(5, impressora.getContadorImpressoes());
 
             // Rotação do contador: se mudou, salva o anterior
             if (impressoraAtual != null &&
-                !impressora.getContadorImpressoes().equals(impressoraAtual.getContadorImpressoes())) {
-                stmt.setInt(6, impressoraAtual.getContadorImpressoes());
+                impressora.getContadorImpressoes().compareTo(impressoraAtual.getContadorImpressoes()) != 0) {
+                stmt.setBigDecimal(6, impressoraAtual.getContadorImpressoes());
             } else if (impressora.getContadorAnterior() != null) {
-                stmt.setInt(6, impressora.getContadorAnterior());
+                stmt.setBigDecimal(6, impressora.getContadorAnterior());
             } else {
-                stmt.setNull(6, java.sql.Types.INTEGER);
+                stmt.setNull(6, java.sql.Types.DECIMAL);
             }
 
             if (impressora.getDataUltimaManutencao() != null) {
@@ -252,7 +253,8 @@ public class ImpressoraDAO {
 
             stmt.setString(9, impressora.getSecretaria());
             stmt.setString(10, impressora.getStatus());
-            stmt.setInt(11, impressora.getId());
+            stmt.setBoolean(11, impressora.getIncluirNoCalculo() != null ? impressora.getIncluirNoCalculo() : true);
+            stmt.setInt(12, impressora.getId());
 
             int rowsAffected = stmt.executeUpdate();
             if (rowsAffected == 0) {
@@ -395,12 +397,15 @@ public class ImpressoraDAO {
 
     /**
      * Calcula custo total mensal por secretaria
+     * Respeita o flag incluir_no_calculo de cada impressora
      */
     public Map<String, BigDecimal> calcularCustoMensalPorSecretaria() throws SQLException {
         Map<String, BigDecimal> custos = new HashMap<>();
 
         String sql = "SELECT secretaria, " +
-                     "SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
+                     "SUM(CASE WHEN incluir_no_calculo = TRUE " +
+                     "THEN (contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0) " +
+                     "ELSE 0 END) as custo_total " +
                      "FROM impressora " +
                      "GROUP BY secretaria " +
                      "ORDER BY secretaria";
@@ -425,11 +430,14 @@ public class ImpressoraDAO {
 
     /**
      * Calcula custo total mensal de uma secretaria específica
+     * Respeita o flag incluir_no_calculo de cada impressora
      */
     public BigDecimal calcularCustoMensalSecretaria(String secretaria) throws SQLException {
         BigDecimal custoTotal = BigDecimal.ZERO;
 
-        String sql = "SELECT SUM((contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0)) as custo_total " +
+        String sql = "SELECT SUM(CASE WHEN incluir_no_calculo = TRUE " +
+                     "THEN (contador_impressoes - IFNULL(contador_anterior, 0)) * IFNULL(custo_por_impressao, 0) " +
+                     "ELSE 0 END) as custo_total " +
                      "FROM impressora WHERE secretaria = ?";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -464,9 +472,11 @@ public class ImpressoraDAO {
         }
 
         String numeroSerie = rs.getString("numero_serie");
-        Integer contadorImpressoes = rs.getInt("contador_impressoes");
 
-        Integer contadorAnterior = rs.getInt("contador_anterior");
+        BigDecimal contadorImpressoes = rs.getBigDecimal("contador_impressoes");
+        if (contadorImpressoes == null) contadorImpressoes = BigDecimal.ZERO;
+
+        BigDecimal contadorAnterior = rs.getBigDecimal("contador_anterior");
         if (rs.wasNull()) {
             contadorAnterior = null;
         }
@@ -480,10 +490,13 @@ public class ImpressoraDAO {
         String secretaria = rs.getString("secretaria");
         String status = rs.getString("status");
 
+        boolean incluirNoCalculo = rs.getBoolean("incluir_no_calculo");
+
         Impressora impressora = new Impressora(id, localInstalacao, modeloEquipamento, custoPorImpressao,
                              numeroSerie, contadorImpressoes, contadorAnterior,
                              dataUltimaManutencao, secretaria, status);
         impressora.setDataRelatorioAnterior(dataRelatorioAnterior);
+        impressora.setIncluirNoCalculo(incluirNoCalculo);
         return impressora;
     }
 }

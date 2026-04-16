@@ -10,9 +10,9 @@ import java.sql.SQLException;
 public class Conexao {
     
     // Configurações do banco de dados - AJUSTE CONFORME SEU AMBIENTE
-    private static final String URL = "jdbc:mysql://localhost:3306/controle_impressoras";
+    private static final String URL = "jdbc:mysql://localhost:3308/controle_impressoras";
     private static final String USUARIO = "root";
-    private static final String SENHA = "@dm1ndb";
+    private static final String SENHA = "";
     
     // Configurações adicionais da URL
     private static final String PARAMETROS = "?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&characterEncoding=utf8";

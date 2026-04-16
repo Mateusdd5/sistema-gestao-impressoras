@@ -30,6 +30,7 @@ public class ImpressoraController extends HttpServlet {
 
         String action = request.getParameter("action");
 
+        // Criar conexão DENTRO do método
         try (Connection conexao = Conexao.getConnection()) {
             ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
 
@@ -80,6 +81,7 @@ public class ImpressoraController extends HttpServlet {
 
         String action = request.getParameter("action");
 
+        // Criar conexão DENTRO do método
         try (Connection conexao = Conexao.getConnection()) {
             ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
 
@@ -122,6 +124,7 @@ public class ImpressoraController extends HttpServlet {
         String dataManutencaoStr = request.getParameter("dataUltimaManutencao");
         String secretaria = request.getParameter("secretaria");
         String status = request.getParameter("status");
+        String incluirNoCalculoStr = request.getParameter("incluirNoCalculo");
 
         // Validações
         if (localInstalacao == null || localInstalacao.trim().isEmpty() ||
@@ -154,17 +157,19 @@ public class ImpressoraController extends HttpServlet {
             return;
         }
 
-        Integer contadorImpressoes = Integer.parseInt(contadorStr);
+        BigDecimal contadorImpressoes = new BigDecimal(contadorStr.trim().replace(",", "."));
 
-        Integer contadorAnterior = null;
+        BigDecimal contadorAnterior = null;
         if (contadorAnteriorStr != null && !contadorAnteriorStr.trim().isEmpty()) {
-            contadorAnterior = Integer.parseInt(contadorAnteriorStr);
+            contadorAnterior = new BigDecimal(contadorAnteriorStr.trim().replace(",", "."));
         }
 
         LocalDate dataUltimaManutencao = null;
         if (dataManutencaoStr != null && !dataManutencaoStr.trim().isEmpty()) {
             dataUltimaManutencao = LocalDate.parse(dataManutencaoStr, DateTimeFormatter.ISO_LOCAL_DATE);
         }
+
+        boolean incluirNoCalculo = "true".equals(incluirNoCalculoStr);
 
         // Detectar custo por impressão automaticamente
         BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
@@ -180,6 +185,7 @@ public class ImpressoraController extends HttpServlet {
             secretaria.trim(),
             status.trim()
         );
+        impressora.setIncluirNoCalculo(incluirNoCalculo);
 
         impressoraDAO.adicionarImpressora(impressora);
 
@@ -204,6 +210,7 @@ public class ImpressoraController extends HttpServlet {
         String dataRelatorioAnteriorStr = request.getParameter("dataRelatorioAnterior");
         String secretaria = request.getParameter("secretaria");
         String status = request.getParameter("status");
+        String incluirNoCalculoStr = request.getParameter("incluirNoCalculo");
 
         if (idStr == null || idStr.trim().isEmpty()) {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, "ID da impressora não fornecido");
@@ -211,11 +218,11 @@ public class ImpressoraController extends HttpServlet {
         }
 
         Integer id = Integer.parseInt(idStr);
-        Integer contadorImpressoes = Integer.parseInt(contadorStr);
+        BigDecimal contadorImpressoes = new BigDecimal(contadorStr.trim().replace(",", "."));
 
-        Integer contadorAnterior = null;
+        BigDecimal contadorAnterior = null;
         if (contadorAnteriorStr != null && !contadorAnteriorStr.trim().isEmpty()) {
-            contadorAnterior = Integer.parseInt(contadorAnteriorStr);
+            contadorAnterior = new BigDecimal(contadorAnteriorStr.trim().replace(",", "."));
         }
 
         LocalDate dataUltimaManutencao = null;
@@ -227,6 +234,8 @@ public class ImpressoraController extends HttpServlet {
         if (dataRelatorioAnteriorStr != null && !dataRelatorioAnteriorStr.trim().isEmpty()) {
             dataRelatorioAnterior = LocalDate.parse(dataRelatorioAnteriorStr, DateTimeFormatter.ISO_LOCAL_DATE);
         }
+
+        boolean incluirNoCalculo = "true".equals(incluirNoCalculoStr);
 
         // Detectar custo por impressão automaticamente
         BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
@@ -247,6 +256,7 @@ public class ImpressoraController extends HttpServlet {
         // Definir o valor manual do relatório anterior (se fornecido)
         // Se null, o DAO decidirá automaticamente via lógica de rotação
         impressora.setDataRelatorioAnterior(dataRelatorioAnterior);
+        impressora.setIncluirNoCalculo(incluirNoCalculo);
 
         impressoraDAO.atualizarImpressora(impressora);
 
@@ -357,9 +367,13 @@ public class ImpressoraController extends HttpServlet {
         dispatcher.forward(request, response);
     }
 
+    /**
+     * Exibe formulário de cadastro de nova impressora
+     */
     private void exibirFormularioCadastro(HttpServletRequest request, HttpServletResponse response,
                                           ImpressoraDAO impressoraDAO) throws Exception {
 
+        // Carregar lista de secretarias
         List<String> listaSecretarias = impressoraDAO.listarSecretarias();
 
         System.out.println("========== FORMULÁRIO CADASTRO ==========");
@@ -370,7 +384,7 @@ public class ImpressoraController extends HttpServlet {
         System.out.println("=========================================");
 
         request.setAttribute("listaSecretarias", listaSecretarias);
-        request.setAttribute("impressora", null);
+        request.setAttribute("impressora", null); // Não está editando
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/cadastroImpressora.jsp");
         dispatcher.forward(request, response);
@@ -393,6 +407,7 @@ public class ImpressoraController extends HttpServlet {
             return;
         }
 
+        // CARREGAR LISTA DE SECRETARIAS!
         List<String> listaSecretarias = impressoraDAO.listarSecretarias();
 
         System.out.println("========== FORMULÁRIO EDIÇÃO ==========");

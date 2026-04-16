@@ -54,13 +54,22 @@ public class ExportarCsvServlet extends HttpServlet {
             
             // Dados
             for (Impressora imp : listaImpressoras) {
+                boolean incluida = imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo();
+
                 writer.print(imp.getSecretaria() + ";");
                 writer.print(imp.getLocalInstalacao() + ";");
                 writer.print(imp.getModeloEquipamento() + ";");
                 writer.print(imp.getNumeroSerie() + ";");
                 writer.print(imp.getContadorImpressoes() + ";");
-                writer.print((imp.getContadorAnterior() != null ? imp.getContadorAnterior() : "0") + ";");
-                writer.print(imp.getImpressoesDoMes() + ";");
+                writer.print((imp.getContadorAnterior() != null ?
+                    imp.getContadorAnterior() : "0") + ";");
+
+                // Impressões do mês — zero se excluída do cálculo
+                if (incluida) {
+                    writer.print(imp.getImpressoesDoMes() + ";");
+                } else {
+                    writer.print("0;");
+                }
                 
                 // Custo por impressão
                 if (imp.getCustoPorImpressao() != null) {
@@ -69,8 +78,8 @@ public class ExportarCsvServlet extends HttpServlet {
                     writer.print("N/A;");
                 }
                 
-                // Custo mensal
-                if (imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes() > 0) {
+                // Custo mensal — zero se excluída do cálculo
+                if (incluida && imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes().compareTo(BigDecimal.ZERO) > 0) {
                     writer.print(currencyFormat.format(imp.getCustoMensal()) + ";");
                 } else {
                     writer.print("R$ 0,00;");

@@ -10,22 +10,25 @@ public class Impressora {
     private String modeloEquipamento;
     private BigDecimal custoPorImpressao;
     private String numeroSerie;
-    private Integer contadorImpressoes;
-    private Integer contadorAnterior;
+    private BigDecimal contadorImpressoes;
+    private BigDecimal contadorAnterior;
     private LocalDate dataUltimaManutencao;
     private LocalDate dataRelatorioAnterior;
     private String secretaria;
     private String status;
+    private Boolean incluirNoCalculo;
 
     public Impressora() {
+        this.incluirNoCalculo = true;
     }
 
     public Impressora(Integer id) {
         this.id = id;
+        this.incluirNoCalculo = true;
     }
 
     public Impressora(String localInstalacao, String modeloEquipamento, BigDecimal custoPorImpressao,
-                     String numeroSerie, Integer contadorImpressoes, Integer contadorAnterior,
+                     String numeroSerie, BigDecimal contadorImpressoes, BigDecimal contadorAnterior,
                      LocalDate dataUltimaManutencao, String secretaria, String status) {
         this.localInstalacao = localInstalacao;
         this.modeloEquipamento = modeloEquipamento;
@@ -36,11 +39,12 @@ public class Impressora {
         this.dataUltimaManutencao = dataUltimaManutencao;
         this.secretaria = secretaria;
         this.status = status;
+        this.incluirNoCalculo = true;
     }
 
     public Impressora(Integer id, String localInstalacao, String modeloEquipamento,
-                     BigDecimal custoPorImpressao, String numeroSerie, Integer contadorImpressoes,
-                     Integer contadorAnterior, LocalDate dataUltimaManutencao, String secretaria, String status) {
+                     BigDecimal custoPorImpressao, String numeroSerie, BigDecimal contadorImpressoes,
+                     BigDecimal contadorAnterior, LocalDate dataUltimaManutencao, String secretaria, String status) {
         this.id = id;
         this.localInstalacao = localInstalacao;
         this.modeloEquipamento = modeloEquipamento;
@@ -51,23 +55,28 @@ public class Impressora {
         this.dataUltimaManutencao = dataUltimaManutencao;
         this.secretaria = secretaria;
         this.status = status;
+        this.incluirNoCalculo = true;
     }
 
     // Método para calcular impressões do mês
-    public Integer getImpressoesDoMes() {
-        if (contadorAnterior == null || contadorAnterior == 0) {
-            return 0;
+    public BigDecimal getImpressoesDoMes() {
+        if (contadorAnterior == null || contadorAnterior.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
         }
-        return contadorImpressoes - contadorAnterior;
+        return contadorImpressoes.subtract(contadorAnterior);
     }
 
     // Método para calcular custo mensal da impressora
+    // Retorna ZERO se a impressora estiver marcada como "não incluir no cálculo"
     public BigDecimal getCustoMensal() {
+        if (incluirNoCalculo == null || !incluirNoCalculo) {
+            return BigDecimal.ZERO;
+        }
         if (custoPorImpressao == null || custoPorImpressao.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        Integer impressoes = getImpressoesDoMes();
-        return custoPorImpressao.multiply(new BigDecimal(impressoes));
+        BigDecimal impressoes = getImpressoesDoMes();
+        return custoPorImpressao.multiply(impressoes);
     }
 
     // Método estático para detectar custo por modelo
@@ -155,19 +164,19 @@ public class Impressora {
         this.numeroSerie = numeroSerie;
     }
 
-    public Integer getContadorImpressoes() {
+    public BigDecimal getContadorImpressoes() {
         return contadorImpressoes;
     }
 
-    public void setContadorImpressoes(Integer contadorImpressoes) {
+    public void setContadorImpressoes(BigDecimal contadorImpressoes) {
         this.contadorImpressoes = contadorImpressoes;
     }
 
-    public Integer getContadorAnterior() {
+    public BigDecimal getContadorAnterior() {
         return contadorAnterior;
     }
 
-    public void setContadorAnterior(Integer contadorAnterior) {
+    public void setContadorAnterior(BigDecimal contadorAnterior) {
         this.contadorAnterior = contadorAnterior;
     }
 
@@ -203,6 +212,14 @@ public class Impressora {
         this.status = status;
     }
 
+    public Boolean getIncluirNoCalculo() {
+        return incluirNoCalculo;
+    }
+
+    public void setIncluirNoCalculo(Boolean incluirNoCalculo) {
+        this.incluirNoCalculo = incluirNoCalculo;
+    }
+
     @Override
     public String toString() {
         return "Impressora{" +
@@ -217,6 +234,7 @@ public class Impressora {
                 ", dataRelatorioAnterior=" + dataRelatorioAnterior +
                 ", secretaria='" + secretaria + '\'' +
                 ", status='" + status + '\'' +
+                ", incluirNoCalculo=" + incluirNoCalculo +
                 '}';
     }
 }
