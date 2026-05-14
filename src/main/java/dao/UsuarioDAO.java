@@ -118,8 +118,8 @@ public class UsuarioDAO {
      * Adiciona novo usuário
      */
     public boolean adicionar(Usuario usuario) throws SQLException {
-        String sql = "INSERT INTO usuario (username, senha_hash, nome_completo, email, nivel_permissao, ativo) " +
-                     "VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO usuario (username, senha_hash, nome_completo, email, nivel_permissao, ativo, secretaria_vinculada) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?)";
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, usuario.getUsername());
@@ -128,6 +128,12 @@ public class UsuarioDAO {
             stmt.setString(4, usuario.getEmail());
             stmt.setString(5, usuario.getNivelPermissao().name());
             stmt.setBoolean(6, usuario.getAtivo());
+
+            if (usuario.getSecretariaVinculada() != null && !usuario.getSecretariaVinculada().trim().isEmpty()) {
+                stmt.setString(7, usuario.getSecretariaVinculada().trim());
+            } else {
+                stmt.setNull(7, java.sql.Types.VARCHAR);
+            }
             
             int linhasAfetadas = stmt.executeUpdate();
             
@@ -148,7 +154,7 @@ public class UsuarioDAO {
      * Atualiza dados do usuário
      */
     public boolean atualizar(Usuario usuario) throws SQLException {
-        String sql = "UPDATE usuario SET nome_completo = ?, email = ?, nivel_permissao = ?, ativo = ? " +
+        String sql = "UPDATE usuario SET nome_completo = ?, email = ?, nivel_permissao = ?, ativo = ?, secretaria_vinculada = ? " +
                      "WHERE id = ?";
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -156,7 +162,14 @@ public class UsuarioDAO {
             stmt.setString(2, usuario.getEmail());
             stmt.setString(3, usuario.getNivelPermissao().name());
             stmt.setBoolean(4, usuario.getAtivo());
-            stmt.setInt(5, usuario.getId());
+
+            if (usuario.getSecretariaVinculada() != null && !usuario.getSecretariaVinculada().trim().isEmpty()) {
+                stmt.setString(5, usuario.getSecretariaVinculada().trim());
+            } else {
+                stmt.setNull(5, java.sql.Types.VARCHAR);
+            }
+
+            stmt.setInt(6, usuario.getId());
             
             return stmt.executeUpdate() > 0;
         }
@@ -327,6 +340,10 @@ public class UsuarioDAO {
         if (ultimoAcesso != null) {
             usuario.setUltimoAcesso(ultimoAcesso.toLocalDateTime());
         }
+
+        // Novo campo: secretaria_vinculada (nullable)
+        String secVinculada = rs.getString("secretaria_vinculada");
+        usuario.setSecretariaVinculada(rs.wasNull() ? null : secVinculada);
         
         return usuario;
     }

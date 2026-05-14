@@ -183,6 +183,7 @@ public class ImpressoraDAO {
      * Atualiza os dados de uma impressora.
      * - Se o contador mudar, salva o antigo em contador_anterior.
      * - Se a data do relatório atualizado mudar, salva a antiga em data_relatorio_anterior.
+     * - Registra automaticamente no histórico quando data ou contador mudam.
      */
     public void atualizarImpressora(Impressora impressora) throws SQLException {
         // Busca estado atual no banco
@@ -267,6 +268,27 @@ public class ImpressoraDAO {
             System.err.println("Erro ao atualizar impressora ID: " + impressora.getId());
             throw new SQLException("Erro ao atualizar impressora: " + e.getMessage(), e);
         }
+
+        // ── Registro no histórico de contadores ──────────────────────────────
+        // Dispara quando a data do relatório existe E (data mudou OU contador mudou).
+        // O INSERT ON DUPLICATE KEY UPDATE do HistoricoContadorDAO garante que:
+        //   - data nova      → insere novo registro
+        //   - mesma data, contador corrigido → atualiza o registro existente (sem lixo no histórico)
+        LocalDate dataAnterior = (impressoraAtual != null) ? impressoraAtual.getDataUltimaManutencao() : null;
+        LocalDate dataNova     = impressora.getDataUltimaManutencao();
+
+        boolean dataMudou     = dataNova != null && !dataNova.equals(dataAnterior);
+        boolean contadorMudou = impressoraAtual != null &&
+                                impressora.getContadorImpressoes()
+                                          .compareTo(impressoraAtual.getContadorImpressoes()) != 0;
+
+        if (dataNova != null && (dataMudou || contadorMudou)) {
+            HistoricoContadorDAO historicoDAO = new HistoricoContadorDAO(conexao);
+            historicoDAO.salvarOuAtualizar(impressora.getId(), dataNova, impressora.getContadorImpressoes());
+            System.out.println("Histórico registrado - impressora ID: " + impressora.getId() +
+                               " | data: " + dataNova + " | contador: " + impressora.getContadorImpressoes());
+        }
+        // ─────────────────────────────────────────────────────────────────────
     }
 
     /**
@@ -397,7 +419,6 @@ public class ImpressoraDAO {
 
     /**
      * Calcula custo total mensal por secretaria
-     * Respeita o flag incluir_no_calculo de cada impressora
      */
     public Map<String, BigDecimal> calcularCustoMensalPorSecretaria() throws SQLException {
         Map<String, BigDecimal> custos = new HashMap<>();
@@ -416,9 +437,7 @@ public class ImpressoraDAO {
             while (rs.next()) {
                 String secretaria = rs.getString("secretaria");
                 BigDecimal custoTotal = rs.getBigDecimal("custo_total");
-                if (custoTotal == null) {
-                    custoTotal = BigDecimal.ZERO;
-                }
+                if (custoTotal == null) custoTotal = BigDecimal.ZERO;
                 custos.put(secretaria, custoTotal);
             }
         } catch (SQLException e) {
@@ -430,7 +449,6 @@ public class ImpressoraDAO {
 
     /**
      * Calcula custo total mensal de uma secretaria específica
-     * Respeita o flag incluir_no_calculo de cada impressora
      */
     public BigDecimal calcularCustoMensalSecretaria(String secretaria) throws SQLException {
         BigDecimal custoTotal = BigDecimal.ZERO;
@@ -446,9 +464,7 @@ public class ImpressoraDAO {
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     BigDecimal resultado = rs.getBigDecimal("custo_total");
-                    if (resultado != null) {
-                        custoTotal = resultado;
-                    }
+                    if (resultado != null) custoTotal = resultado;
                 }
             }
         } catch (SQLException e) {
@@ -467,9 +483,7 @@ public class ImpressoraDAO {
         String modeloEquipamento = rs.getString("modelo_equipamento");
 
         BigDecimal custoPorImpressao = rs.getBigDecimal("custo_por_impressao");
-        if (rs.wasNull()) {
-            custoPorImpressao = null;
-        }
+        if (rs.wasNull()) custoPorImpressao = null;
 
         String numeroSerie = rs.getString("numero_serie");
 
@@ -477,9 +491,7 @@ public class ImpressoraDAO {
         if (contadorImpressoes == null) contadorImpressoes = BigDecimal.ZERO;
 
         BigDecimal contadorAnterior = rs.getBigDecimal("contador_anterior");
-        if (rs.wasNull()) {
-            contadorAnterior = null;
-        }
+        if (rs.wasNull()) contadorAnterior = null;
 
         Date dataManutencao = rs.getDate("data_ultima_manutencao");
         LocalDate dataUltimaManutencao = (dataManutencao != null) ? dataManutencao.toLocalDate() : null;

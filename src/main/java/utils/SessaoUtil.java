@@ -38,6 +38,7 @@ public class SessaoUtil {
         session.setAttribute("usuarioId", usuario.getId());
         session.setAttribute("username", usuario.getUsername());
         session.setAttribute("nivelPermissao", usuario.getNivelPermissao());
+        session.setAttribute("secretariaVinculada", usuario.getSecretariaVinculada()); // NOVO
         session.setAttribute("loginTimestamp", System.currentTimeMillis());
     }
     
@@ -93,6 +94,7 @@ public class SessaoUtil {
         if (session != null) {
             session.setAttribute(ATRIBUTO_USUARIO, usuario);
             session.setAttribute("nivelPermissao", usuario.getNivelPermissao());
+            session.setAttribute("secretariaVinculada", usuario.getSecretariaVinculada()); // NOVO
         }
     }
     

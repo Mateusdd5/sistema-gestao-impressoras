@@ -17,6 +17,7 @@ public class Usuario {
     private Boolean ativo;
     private LocalDateTime dataCriacao;
     private LocalDateTime ultimoAcesso;
+    private String secretariaVinculada; // null = TI (acesso total); preenchido = usuário de secretaria
     
     // Construtores
     
@@ -120,6 +121,22 @@ public class Usuario {
     public void setUltimoAcesso(LocalDateTime ultimoAcesso) {
         this.ultimoAcesso = ultimoAcesso;
     }
+
+    public String getSecretariaVinculada() {
+        return secretariaVinculada;
+    }
+
+    public void setSecretariaVinculada(String secretariaVinculada) {
+        this.secretariaVinculada = secretariaVinculada;
+    }
+
+    /**
+     * Retorna true se este usuário é de secretaria (visão restrita).
+     * Usuários TI (visitante, operador, técnico, admin) têm secretariaVinculada == null.
+     */
+    public boolean isUsuarioSecretaria() {
+        return secretariaVinculada != null && !secretariaVinculada.trim().isEmpty();
+    }
     
     // Métodos de verificação de permissão
     
@@ -197,6 +214,7 @@ public class Usuario {
                 ", nomeCompleto='" + nomeCompleto + '\'' +
                 ", nivelPermissao=" + nivelPermissao +
                 ", ativo=" + ativo +
+                ", secretariaVinculada='" + secretariaVinculada + '\'' +
                 '}';
     }
     

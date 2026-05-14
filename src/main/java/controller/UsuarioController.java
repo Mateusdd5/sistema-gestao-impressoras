@@ -5,6 +5,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import dao.ImpressoraDAO;
 import dao.UsuarioDAO;
 import model.Usuario;
 import model.NivelPermissao;
@@ -15,6 +16,7 @@ import utils.SessaoUtil;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -108,12 +110,11 @@ public class UsuarioController extends HttpServlet {
     }
     
     /**
-     * Lista todos os usuários
+     * Lista todos os usuários e carrega as secretarias para o formulário
      */
     private void listarUsuarios(HttpServletRequest request, HttpServletResponse response,
                                 UsuarioDAO usuarioDAO) throws ServletException, IOException, SQLException {
         
-        // Verificar se é admin
         if (!SessaoUtil.isAdmin(request)) {
             response.sendRedirect(request.getContextPath() + "/pages/acessoNegado.jsp");
             return;
@@ -124,12 +125,20 @@ public class UsuarioController extends HttpServlet {
         request.setAttribute("listaUsuarios", listaUsuarios);
         request.setAttribute("totalUsuarios", listaUsuarios.size());
         request.setAttribute("usuariosAtivos", usuarioDAO.contarUsuariosAtivos());
+
+        // Carrega lista de secretarias para o campo secretariaVinculada no formulário
+        try (Connection conexaoSec = Conexao.getConnection()) {
+            ImpressoraDAO impDAO = new ImpressoraDAO(conexaoSec);
+            request.setAttribute("listaSecretarias", impDAO.listarSecretarias());
+        } catch (Exception e) {
+            request.setAttribute("listaSecretarias", new ArrayList<>());
+        }
         
         request.getRequestDispatcher("/pages/listaUsuarios.jsp").forward(request, response);
     }
     
     /**
-     * Exibe formulário de edição
+     * Exibe formulário de edição e carrega secretarias
      */
     private void exibirFormularioEdicao(HttpServletRequest request, HttpServletResponse response,
                                         UsuarioDAO usuarioDAO) throws ServletException, IOException, SQLException {
@@ -141,24 +150,40 @@ public class UsuarioController extends HttpServlet {
             response.sendRedirect(request.getContextPath() + "/UsuarioController");
             return;
         }
+
+        // Carrega lista de secretarias para o campo secretariaVinculada no formulário
+        try (Connection conexaoSec = Conexao.getConnection()) {
+            ImpressoraDAO impDAO = new ImpressoraDAO(conexaoSec);
+            request.setAttribute("listaSecretarias", impDAO.listarSecretarias());
+        } catch (Exception e) {
+            request.setAttribute("listaSecretarias", new ArrayList<>());
+        }
         
         request.setAttribute("usuario", usuario);
         request.getRequestDispatcher("/pages/cadastroUsuario.jsp").forward(request, response);
     }
     
     /**
-     * Adiciona novo usuário
+     * Adiciona novo usuário.
+     * Lê o campo secretariaVinculada do formulário:
+     * - Vazio ou ausente → null (usuário TI, acesso total)
+     * - Preenchido       → usuário de secretaria (visão restrita)
      */
     private void adicionarUsuario(HttpServletRequest request, HttpServletResponse response,
                                   UsuarioDAO usuarioDAO) throws IOException, SQLException {
         
-        String username = request.getParameter("username").trim();
-        String senha = request.getParameter("senha");
+        String username     = request.getParameter("username").trim();
+        String senha        = request.getParameter("senha");
         String nomeCompleto = request.getParameter("nomeCompleto").trim();
-        String email = request.getParameter("email");
-        String nivelStr = request.getParameter("nivelPermissao");
-        
-        // Validações
+        String email        = request.getParameter("email");
+        String nivelStr     = request.getParameter("nivelPermissao");
+        String secVinculada = request.getParameter("secretariaVinculada");
+
+        // Normaliza: string vazia vira null
+        if (secVinculada != null && secVinculada.trim().isEmpty()) {
+            secVinculada = null;
+        }
+
         if (usuarioDAO.usernameExiste(username)) {
             response.sendRedirect(request.getContextPath() + 
                 "/pages/cadastroUsuario.jsp?erro=username_existe");
@@ -172,16 +197,14 @@ public class UsuarioController extends HttpServlet {
             return;
         }
         
-        // Criptografar senha
         String senhaHash = SenhaUtil.criptografarSenha(senha);
         
-        // Criar usuário
         NivelPermissao nivel = NivelPermissao.valueOf(nivelStr);
         Usuario novoUsuario = new Usuario(username, senhaHash, nomeCompleto, nivel);
         novoUsuario.setEmail(email);
+        novoUsuario.setSecretariaVinculada(secVinculada);
         
         if (usuarioDAO.adicionar(novoUsuario)) {
-            // Registrar log
             Integer usuarioLogadoId = SessaoUtil.obterUsuarioId(request);
             String ipCliente = SessaoUtil.obterIpCliente(request);
             usuarioDAO.registrarLog(usuarioLogadoId, "CRIAR_USUARIO", 
@@ -196,17 +219,23 @@ public class UsuarioController extends HttpServlet {
     }
     
     /**
-     * Atualiza dados do usuário
+     * Atualiza dados do usuário, incluindo secretariaVinculada.
      */
     private void atualizarUsuario(HttpServletRequest request, HttpServletResponse response,
                                   UsuarioDAO usuarioDAO) throws IOException, SQLException {
         
-        int id = Integer.parseInt(request.getParameter("id"));
+        int id              = Integer.parseInt(request.getParameter("id"));
         String nomeCompleto = request.getParameter("nomeCompleto").trim();
-        String email = request.getParameter("email");
-        String nivelStr = request.getParameter("nivelPermissao");
-        boolean ativo = "true".equals(request.getParameter("ativo"));
-        
+        String email        = request.getParameter("email");
+        String nivelStr     = request.getParameter("nivelPermissao");
+        boolean ativo       = "true".equals(request.getParameter("ativo"));
+        String secVinculada = request.getParameter("secretariaVinculada");
+
+        // Normaliza: string vazia vira null
+        if (secVinculada != null && secVinculada.trim().isEmpty()) {
+            secVinculada = null;
+        }
+
         Usuario usuario = usuarioDAO.buscarPorId(id);
         
         if (usuario != null) {
@@ -214,9 +243,9 @@ public class UsuarioController extends HttpServlet {
             usuario.setEmail(email);
             usuario.setNivelPermissao(NivelPermissao.valueOf(nivelStr));
             usuario.setAtivo(ativo);
+            usuario.setSecretariaVinculada(secVinculada);
             
             if (usuarioDAO.atualizar(usuario)) {
-                // Registrar log
                 Integer usuarioLogadoId = SessaoUtil.obterUsuarioId(request);
                 String ipCliente = SessaoUtil.obterIpCliente(request);
                 usuarioDAO.registrarLog(usuarioLogadoId, "ATUALIZAR_USUARIO", 
@@ -252,7 +281,6 @@ public class UsuarioController extends HttpServlet {
         String novaSenhaHash = SenhaUtil.criptografarSenha(novaSenha);
         
         if (usuarioDAO.atualizarSenha(id, novaSenhaHash)) {
-            // Registrar log
             Integer usuarioLogadoId = SessaoUtil.obterUsuarioId(request);
             String ipCliente = SessaoUtil.obterIpCliente(request);
             usuarioDAO.registrarLog(usuarioLogadoId, "ALTERAR_SENHA", 
@@ -267,7 +295,7 @@ public class UsuarioController extends HttpServlet {
     }
     
     /**
-     * Desativa usuário
+     * Desativa usuário (não deleta do banco)
      */
     private void desativarUsuario(HttpServletRequest request, HttpServletResponse response,
                                   UsuarioDAO usuarioDAO) throws IOException, SQLException {
@@ -275,7 +303,6 @@ public class UsuarioController extends HttpServlet {
         int id = Integer.parseInt(request.getParameter("id"));
         
         if (usuarioDAO.desativar(id)) {
-            // Registrar log
             Integer usuarioLogadoId = SessaoUtil.obterUsuarioId(request);
             String ipCliente = SessaoUtil.obterIpCliente(request);
             usuarioDAO.registrarLog(usuarioLogadoId, "DESATIVAR_USUARIO", 
@@ -298,7 +325,6 @@ public class UsuarioController extends HttpServlet {
         int id = Integer.parseInt(request.getParameter("id"));
         
         if (usuarioDAO.reativar(id)) {
-            // Registrar log
             Integer usuarioLogadoId = SessaoUtil.obterUsuarioId(request);
             String ipCliente = SessaoUtil.obterIpCliente(request);
             usuarioDAO.registrarLog(usuarioLogadoId, "REATIVAR_USUARIO", 
@@ -313,7 +339,8 @@ public class UsuarioController extends HttpServlet {
     }
     
     /**
-     * Deleta usuário permanentemente
+     * Deleta usuário permanentemente do banco
+     * CUIDADO: Esta operação é irreversível!
      */
     private void deletarUsuario(HttpServletRequest request, HttpServletResponse response,
                                UsuarioDAO usuarioDAO) throws IOException, SQLException {
@@ -329,7 +356,6 @@ public class UsuarioController extends HttpServlet {
         }
         
         if (usuarioDAO.deletar(id)) {
-            // Registrar log
             String ipCliente = SessaoUtil.obterIpCliente(request);
             usuarioDAO.registrarLog(usuarioLogadoId, "DELETAR_USUARIO", 
                                    "Deletou usuário ID: " + id, ipCliente);

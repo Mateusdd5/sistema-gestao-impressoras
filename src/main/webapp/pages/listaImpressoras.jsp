@@ -252,11 +252,23 @@ body {
             align-items: center;
             gap: 8px;
         }
+
+        /* Badge de secretaria fixa para usuários de secretaria */
+        .secretaria-badge-fixa {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
 <%
-    // Obter usuário logado
     Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
 
     @SuppressWarnings("unchecked")
@@ -275,6 +287,8 @@ body {
     if (filtroAtual == null) filtroAtual = "";
     if (secretariaSelecionada == null) secretariaSelecionada = "TODAS";
 
+    boolean isUsuarioSecretaria = usuarioLogado != null && usuarioLogado.isUsuarioSecretaria();
+
     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
     DecimalFormat dfContador = new DecimalFormat("#,##0.##");
@@ -292,10 +306,16 @@ body {
                 <small>
                     <i class="bi bi-shield-check"></i>
                     <%= usuarioLogado.getNivelPermissaoDescricao() %>
+                    <% if (isUsuarioSecretaria) { %>
+                        &nbsp;&mdash;&nbsp;<i class="bi bi-building"></i> <%= usuarioLogado.getSecretariaVinculada() %>
+                    <% } %>
                 </small>
             </div>
         </div>
         <div class="navbar-actions">
+<a href="<%= request.getContextPath() %>/HistoricoContadorServlet" class="btn btn-outline-secondary">
+    <i class="bi bi-clock-history"></i> Histórico
+</a>
             <% if (usuarioLogado.podeGerenciarUsuarios()) { %>
                 <a href="<%= request.getContextPath() %>/UsuarioController" class="btn btn-outline-primary">
                     <i class="bi bi-people"></i> Usuários
@@ -309,7 +329,9 @@ body {
 </div>
 
 <div class="main-container">
-    <!-- Sidebar de Secretarias -->
+
+    <!-- Sidebar de Secretarias: visível apenas para usuários TI -->
+    <% if (!isUsuarioSecretaria) { %>
     <div class="sidebar">
         <div class="sidebar-card">
             <h5><i class="bi bi-funnel"></i> Filtrar por Secretaria</h5>
@@ -333,6 +355,7 @@ body {
             </form>
         </div>
     </div>
+    <% } %>
 
     <!-- Conteúdo Principal -->
     <div class="content">
@@ -341,6 +364,12 @@ body {
                 <div class="d-flex justify-content-between align-items-center flex-wrap">
                     <h4 class="mb-0">
                         <i class="bi bi-printer"></i> Controle de Impressoras
+                        <% if (isUsuarioSecretaria) { %>
+                            &nbsp;
+                            <span class="secretaria-badge-fixa" style="display:inline-flex; font-size:0.75rem; padding:5px 12px;">
+                                <i class="bi bi-building"></i> <%= usuarioLogado.getSecretariaVinculada() %>
+                            </span>
+                        <% } %>
                     </h4>
                     <div class="export-buttons">
                         <% if (usuarioLogado.podeCadastrar()) { %>
@@ -348,10 +377,10 @@ body {
                                 <i class="bi bi-plus-circle"></i> Nova Impressora
                             </a>
                         <% } %>
-                        <a href="ExportarCsvServlet" class="btn btn-success">
+                       <a href="ExportarCsvServlet?secretaria=<%= secretariaSelecionada %>" class="btn btn-success">
                             <i class="bi bi-file-earmark-spreadsheet"></i> Exportar CSV
                         </a>
-                        <a href="ExportarExcelServlet" class="btn btn-success">
+                        <a href="ExportarExcelServlet?secretaria=<%= secretariaSelecionada %>" class="btn btn-success">
                             <i class="bi bi-file-earmark-excel"></i> Exportar Excel
                         </a>
                         <a href="ImpressoraController?action=relatorioImpressao&secretaria=<%= secretariaSelecionada %>"

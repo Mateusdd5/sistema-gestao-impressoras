@@ -1,6 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ page import="model.Usuario" %>
 <%@ page import="model.NivelPermissao" %>
+<%@ page import="java.util.List" %>
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -62,13 +63,34 @@
             font-size: 0.85rem;
             margin-top: 5px;
         }
+
+        .secretaria-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .secretaria-info-ti {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
 <%
     Usuario usuarioEdicao = (Usuario) request.getAttribute("usuario");
     boolean isEdicao = usuarioEdicao != null;
-    
+
+    @SuppressWarnings("unchecked")
+    List<String> listaSecretarias = (List<String>) request.getAttribute("listaSecretarias");
+
     String erro = request.getParameter("erro");
 %>
 
@@ -168,6 +190,32 @@
                                     <% } %>
                                 </select>
                                 <div id="infoNivel" class="nivel-info" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Secretaria Vinculada -->
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="secretariaVinculada" class="form-label">
+                                    <i class="bi bi-building"></i> Secretaria Vinculada
+                                </label>
+                                <select class="form-select" id="secretariaVinculada" name="secretariaVinculada" onchange="mostrarInfoSecretaria()">
+                                    <option value="">— Nenhuma (usuário TI — acesso a todas as secretarias) —</option>
+                                    <% if (listaSecretarias != null) {
+                                        for (String sec : listaSecretarias) {
+                                            String selected = "";
+                                            if (isEdicao && sec.equals(usuarioEdicao.getSecretariaVinculada())) {
+                                                selected = "selected";
+                                            }
+                                    %>
+                                        <option value="<%= sec %>" <%= selected %>><%= sec %></option>
+                                    <%  }
+                                    } %>
+                                </select>
+                                <div id="infoSecretaria" style="display: none;"></div>
+                                <small class="text-muted">
+                                    Se selecionada, o usuário só verá as impressoras dessa secretaria e não poderá navegar para outras.
+                                </small>
                             </div>
                         </div>
 
@@ -301,6 +349,23 @@ function mostrarInfoNivel() {
     }
 }
 
+// Mostrar aviso sobre secretaria vinculada
+function mostrarInfoSecretaria() {
+    const select = document.getElementById('secretariaVinculada');
+    const infoDiv = document.getElementById('infoSecretaria');
+    const valor = select.value;
+
+    if (valor) {
+        infoDiv.className = 'secretaria-info mt-1';
+        infoDiv.innerHTML = '🏢 Este usuário verá <strong>apenas</strong> as impressoras da secretaria <strong>' + valor + '</strong>.';
+        infoDiv.style.display = 'block';
+    } else {
+        infoDiv.className = 'secretaria-info-ti mt-1';
+        infoDiv.innerHTML = '🖥️ Usuário TI: acesso a <strong>todas</strong> as secretarias.';
+        infoDiv.style.display = 'block';
+    }
+}
+
 // Alterar senha (apenas ao editar)
 <% if (isEdicao) { %>
 function alterarSenha() {
@@ -343,6 +408,7 @@ function alterarSenha() {
 // Mostrar info do nível ao carregar a página
 <% if (isEdicao) { %>
 mostrarInfoNivel();
+mostrarInfoSecretaria();
 <% } %>
 </script>
 </body>

@@ -7,8 +7,10 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import model.Impressora;
+import model.Usuario;
 import dao.ImpressoraDAO;
 import utils.Conexao;
+import utils.SessaoUtil;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -30,7 +32,6 @@ public class ImpressoraController extends HttpServlet {
 
         String action = request.getParameter("action");
 
-        // Criar conexão DENTRO do método
         try (Connection conexao = Conexao.getConnection()) {
             ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
 
@@ -81,7 +82,6 @@ public class ImpressoraController extends HttpServlet {
 
         String action = request.getParameter("action");
 
-        // Criar conexão DENTRO do método
         try (Connection conexao = Conexao.getConnection()) {
             ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
 
@@ -126,7 +126,6 @@ public class ImpressoraController extends HttpServlet {
         String status = request.getParameter("status");
         String incluirNoCalculoStr = request.getParameter("incluirNoCalculo");
 
-        // Validações
         if (localInstalacao == null || localInstalacao.trim().isEmpty() ||
             modeloEquipamento == null || modeloEquipamento.trim().isEmpty() ||
             numeroSerie == null || numeroSerie.trim().isEmpty() ||
@@ -144,7 +143,6 @@ public class ImpressoraController extends HttpServlet {
             return;
         }
 
-        // Verifica se o número de série já existe
         Impressora impressoraExistente = impressoraDAO.buscarPorNumeroSerie(numeroSerie.trim());
         if (impressoraExistente != null) {
             response.setContentType("text/html; charset=UTF-8");
@@ -171,7 +169,6 @@ public class ImpressoraController extends HttpServlet {
 
         boolean incluirNoCalculo = "true".equals(incluirNoCalculoStr);
 
-        // Detectar custo por impressão automaticamente
         BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
 
         Impressora impressora = new Impressora(
@@ -237,7 +234,6 @@ public class ImpressoraController extends HttpServlet {
 
         boolean incluirNoCalculo = "true".equals(incluirNoCalculoStr);
 
-        // Detectar custo por impressão automaticamente
         BigDecimal custoPorImpressao = Impressora.detectarCustoPorModelo(modeloEquipamento.trim());
 
         Impressora impressora = new Impressora(
@@ -253,8 +249,6 @@ public class ImpressoraController extends HttpServlet {
             status.trim()
         );
 
-        // Definir o valor manual do relatório anterior (se fornecido)
-        // Se null, o DAO decidirá automaticamente via lógica de rotação
         impressora.setDataRelatorioAnterior(dataRelatorioAnterior);
         impressora.setIncluirNoCalculo(incluirNoCalculo);
 
@@ -290,16 +284,34 @@ public class ImpressoraController extends HttpServlet {
         out.close();
     }
 
+    /**
+     * Lista impressoras respeitando o escopo do usuário logado.
+     * Usuário de secretaria → vê apenas a própria secretaria.
+     * Usuário TI            → vê todas.
+     */
     private void listarImpressoras(HttpServletRequest request, HttpServletResponse response,
                                    ImpressoraDAO impressoraDAO) throws Exception {
-        List<Impressora> listaImpressoras = impressoraDAO.listarImpressoras();
-        List<String> listaSecretarias = impressoraDAO.listarSecretarias();
-        int totalImpressoras = impressoraDAO.contarImpressoras();
 
-        if (listaImpressoras == null || listaImpressoras.isEmpty()) {
-            System.out.println("Nenhuma impressora cadastrada.");
+        Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
+        String secretariaForçada = (usuarioLogado != null) ? usuarioLogado.getSecretariaVinculada() : null;
+
+        List<Impressora> listaImpressoras;
+        List<String> listaSecretarias;
+        int totalImpressoras;
+        String secretariaSelecionada;
+
+        if (secretariaForçada != null) {
+            // Usuário de secretaria: escopo fixo, não mostra o seletor
+            listaImpressoras    = impressoraDAO.listarImpressorasPorSecretaria(secretariaForçada);
+            listaSecretarias    = null; // sidebar oculta
+            totalImpressoras    = listaImpressoras.size();
+            secretariaSelecionada = secretariaForçada;
         } else {
-            System.out.println("Total de impressoras: " + listaImpressoras.size());
+            // Usuário TI: comportamento original
+            listaImpressoras    = impressoraDAO.listarImpressoras();
+            listaSecretarias    = impressoraDAO.listarSecretarias();
+            totalImpressoras    = impressoraDAO.contarImpressoras();
+            secretariaSelecionada = "TODAS";
         }
 
         request.setAttribute("listaImpressoras", listaImpressoras);
@@ -307,40 +319,81 @@ public class ImpressoraController extends HttpServlet {
         request.setAttribute("totalResultados", totalImpressoras);
         request.setAttribute("temFiltro", false);
         request.setAttribute("filtroAtual", "");
-        request.setAttribute("secretariaSelecionada", "TODAS");
+        request.setAttribute("secretariaSelecionada", secretariaSelecionada);
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/listaImpressoras.jsp");
         dispatcher.forward(request, response);
     }
 
+    /**
+     * Busca por texto respeitando o escopo do usuário logado.
+     */
     private void buscarImpressoras(HttpServletRequest request, HttpServletResponse response,
                                    ImpressoraDAO impressoraDAO) throws Exception {
+
         String filtro = request.getParameter("filtro");
+        Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
+        String secretariaForçada = (usuarioLogado != null) ? usuarioLogado.getSecretariaVinculada() : null;
 
         List<Impressora> listaImpressoras;
-        List<String> listaSecretarias = impressoraDAO.listarSecretarias();
+        List<String> listaSecretarias;
 
-        if (filtro != null && !filtro.trim().isEmpty()) {
-            listaImpressoras = impressoraDAO.buscarImpressorasPorFiltro(filtro);
+        if (secretariaForçada != null) {
+            // Usuário de secretaria: busca somente dentro da própria secretaria
+            List<Impressora> todasDaSecretaria = impressoraDAO.listarImpressorasPorSecretaria(secretariaForçada);
+            if (filtro != null && !filtro.trim().isEmpty()) {
+                String filtroLower = filtro.trim().toLowerCase();
+                listaImpressoras = todasDaSecretaria.stream()
+                    .filter(imp ->
+                        (imp.getLocalInstalacao()   != null && imp.getLocalInstalacao().toLowerCase().contains(filtroLower)) ||
+                        (imp.getModeloEquipamento() != null && imp.getModeloEquipamento().toLowerCase().contains(filtroLower)) ||
+                        (imp.getNumeroSerie()       != null && imp.getNumeroSerie().toLowerCase().contains(filtroLower))
+                    ).collect(java.util.stream.Collectors.toList());
+            } else {
+                listaImpressoras = todasDaSecretaria;
+            }
+            listaSecretarias = null;
         } else {
-            listaImpressoras = impressoraDAO.listarImpressoras();
+            // Usuário TI: comportamento original
+            if (filtro != null && !filtro.trim().isEmpty()) {
+                listaImpressoras = impressoraDAO.buscarImpressorasPorFiltro(filtro);
+            } else {
+                listaImpressoras = impressoraDAO.listarImpressoras();
+            }
+            listaSecretarias = impressoraDAO.listarSecretarias();
         }
 
         int totalResultados = listaImpressoras.size();
+        String secretariaSelecionada = (secretariaForçada != null) ? secretariaForçada : "TODAS";
 
         request.setAttribute("listaImpressoras", listaImpressoras);
         request.setAttribute("listaSecretarias", listaSecretarias);
         request.setAttribute("totalResultados", totalResultados);
         request.setAttribute("temFiltro", filtro != null && !filtro.trim().isEmpty());
         request.setAttribute("filtroAtual", filtro != null ? filtro : "");
-        request.setAttribute("secretariaSelecionada", "TODAS");
+        request.setAttribute("secretariaSelecionada", secretariaSelecionada);
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/listaImpressoras.jsp");
         dispatcher.forward(request, response);
     }
 
+    /**
+     * Filtro por secretaria — bloqueado para usuários de secretaria
+     * (eles não podem navegar para outra secretaria).
+     */
     private void filtrarPorSecretaria(HttpServletRequest request, HttpServletResponse response,
                                       ImpressoraDAO impressoraDAO) throws Exception {
+
+        Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
+        String secretariaForçada = (usuarioLogado != null) ? usuarioLogado.getSecretariaVinculada() : null;
+
+        // Se for usuário de secretaria, ignora o parâmetro e redireciona para a listagem normal
+        if (secretariaForçada != null) {
+            listarImpressoras(request, response, impressoraDAO);
+            return;
+        }
+
+        // Comportamento original para usuários TI
         String secretaria = request.getParameter("secretaria");
 
         List<Impressora> listaImpressoras;
@@ -348,12 +401,12 @@ public class ImpressoraController extends HttpServlet {
         int totalResultados;
 
         if (secretaria != null && !secretaria.trim().isEmpty() && !secretaria.equals("TODAS")) {
-            listaImpressoras = impressoraDAO.listarImpressorasPorSecretaria(secretaria);
-            totalResultados = impressoraDAO.contarImpressorasPorSecretaria(secretaria);
+            listaImpressoras  = impressoraDAO.listarImpressorasPorSecretaria(secretaria);
+            totalResultados   = impressoraDAO.contarImpressorasPorSecretaria(secretaria);
         } else {
-            listaImpressoras = impressoraDAO.listarImpressoras();
-            totalResultados = impressoraDAO.contarImpressoras();
-            secretaria = "TODAS";
+            listaImpressoras  = impressoraDAO.listarImpressoras();
+            totalResultados   = impressoraDAO.contarImpressoras();
+            secretaria        = "TODAS";
         }
 
         request.setAttribute("listaImpressoras", listaImpressoras);
@@ -367,13 +420,9 @@ public class ImpressoraController extends HttpServlet {
         dispatcher.forward(request, response);
     }
 
-    /**
-     * Exibe formulário de cadastro de nova impressora
-     */
     private void exibirFormularioCadastro(HttpServletRequest request, HttpServletResponse response,
                                           ImpressoraDAO impressoraDAO) throws Exception {
 
-        // Carregar lista de secretarias
         List<String> listaSecretarias = impressoraDAO.listarSecretarias();
 
         System.out.println("========== FORMULÁRIO CADASTRO ==========");
@@ -384,7 +433,7 @@ public class ImpressoraController extends HttpServlet {
         System.out.println("=========================================");
 
         request.setAttribute("listaSecretarias", listaSecretarias);
-        request.setAttribute("impressora", null); // Não está editando
+        request.setAttribute("impressora", null);
 
         RequestDispatcher dispatcher = request.getRequestDispatcher("pages/cadastroImpressora.jsp");
         dispatcher.forward(request, response);
@@ -407,7 +456,6 @@ public class ImpressoraController extends HttpServlet {
             return;
         }
 
-        // CARREGAR LISTA DE SECRETARIAS!
         List<String> listaSecretarias = impressoraDAO.listarSecretarias();
 
         System.out.println("========== FORMULÁRIO EDIÇÃO ==========");

@@ -6,8 +6,10 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import model.Impressora;
+import model.Usuario;
 import dao.ImpressoraDAO;
 import utils.Conexao;
+import utils.SessaoUtil;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -21,37 +23,48 @@ import java.util.Locale;
 @WebServlet("/ExportarCsvServlet")
 public class ExportarCsvServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    private ImpressoraDAO impressoraDAO;
-
-    @Override
-    public void init() throws ServletException {
-        try {
-            Connection conexao = Conexao.getConnection();
-            impressoraDAO = new ImpressoraDAO(conexao);
-        } catch (Exception e) {
-            throw new ServletException("Erro ao inicializar ExportarCsvServlet: " + e.getMessage(), e);
-        }
-    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
-        try {
-            // Busca todas as impressoras
-            List<Impressora> listaImpressoras = impressoraDAO.listarImpressoras();
-            
-            // Configura a resposta como arquivo CSV
+
+        try (Connection conexao = Conexao.getConnection()) {
+            ImpressoraDAO impressoraDAO = new ImpressoraDAO(conexao);
+
+            // Determinar filtro de secretaria
+            Usuario usuarioLogado = SessaoUtil.obterUsuarioLogado(request);
+            String secretaria = null;
+
+            if (usuarioLogado != null && usuarioLogado.isUsuarioSecretaria()) {
+                secretaria = usuarioLogado.getSecretariaVinculada();
+            } else {
+                secretaria = request.getParameter("secretaria");
+            }
+
+            boolean filtrandoPorSecretaria = secretaria != null
+                    && !secretaria.trim().isEmpty()
+                    && !secretaria.equals("TODAS");
+
+            List<Impressora> listaImpressoras;
+            if (filtrandoPorSecretaria) {
+                listaImpressoras = impressoraDAO.listarImpressorasPorSecretaria(secretaria);
+            } else {
+                listaImpressoras = impressoraDAO.listarImpressoras();
+            }
+
             response.setContentType("text/csv; charset=UTF-8");
-            response.setHeader("Content-Disposition", "attachment; filename=impressoras.csv");
-            
+            response.setHeader("Content-Disposition",
+                    "attachment; filename=impressoras" +
+                    (filtrandoPorSecretaria ? "_" + secretaria : "") + ".csv");
+
             PrintWriter writer = response.getWriter();
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
             NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(new Locale("pt", "BR"));
-            
-            // Cabeçalho do CSV
-            writer.println("Secretaria;Local de Instalação;Modelo;Número de Série;Contador Atual;Contador Anterior;Impressões do Mês;Custo/Página;Custo Mensal;Último Relatório;Status");
-            
+
+            // Cabeçalho
+            writer.println("Secretaria;Local de Instalação;Modelo;Número de Série;Contador Atual;" +
+                           "Contador Anterior;Impressões do Mês;Custo/Página;Custo Mensal;Último Relatório;Status");
+
             // Dados
             for (Impressora imp : listaImpressoras) {
                 boolean incluida = imp.getIncluirNoCalculo() != null && imp.getIncluirNoCalculo();
@@ -61,41 +74,35 @@ public class ExportarCsvServlet extends HttpServlet {
                 writer.print(imp.getModeloEquipamento() + ";");
                 writer.print(imp.getNumeroSerie() + ";");
                 writer.print(imp.getContadorImpressoes() + ";");
-                writer.print((imp.getContadorAnterior() != null ?
-                    imp.getContadorAnterior() : "0") + ";");
+                writer.print((imp.getContadorAnterior() != null ? imp.getContadorAnterior() : "0") + ";");
 
-                // Impressões do mês — zero se excluída do cálculo
-                if (incluida) {
-                    writer.print(imp.getImpressoesDoMes() + ";");
-                } else {
-                    writer.print("0;");
-                }
-                
-                // Custo por impressão
+                writer.print((incluida ? imp.getImpressoesDoMes() : BigDecimal.ZERO) + ";");
+
                 if (imp.getCustoPorImpressao() != null) {
                     writer.print(currencyFormat.format(imp.getCustoPorImpressao()) + ";");
                 } else {
                     writer.print("N/A;");
                 }
-                
-                // Custo mensal — zero se excluída do cálculo
-                if (incluida && imp.getCustoPorImpressao() != null && imp.getImpressoesDoMes().compareTo(BigDecimal.ZERO) > 0) {
+
+                if (incluida && imp.getCustoPorImpressao() != null
+                        && imp.getImpressoesDoMes().compareTo(BigDecimal.ZERO) > 0) {
                     writer.print(currencyFormat.format(imp.getCustoMensal()) + ";");
                 } else {
                     writer.print("R$ 0,00;");
                 }
-                
-                writer.print((imp.getDataUltimaManutencao() != null ? imp.getDataUltimaManutencao().format(formatter) : "-") + ";");
+
+                writer.print((imp.getDataUltimaManutencao() != null
+                        ? imp.getDataUltimaManutencao().format(formatter) : "-") + ";");
                 writer.println(imp.getStatus());
             }
-            
+
             writer.flush();
             writer.close();
-            
+
         } catch (Exception e) {
             e.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                             "Erro ao exportar CSV: " + e.getMessage());
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    "Erro ao exportar CSV: " + e.getMessage());
         }
     }
 }
