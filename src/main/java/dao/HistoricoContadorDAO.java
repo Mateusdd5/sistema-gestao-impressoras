@@ -33,10 +33,6 @@ public class HistoricoContadorDAO {
     /**
      * Salva ou atualiza um registro de histórico.
      * Chamado automaticamente por ImpressoraDAO.atualizarImpressora().
-     *
-     * @param impressoraId  ID da impressora
-     * @param dataRelatorio Nova data do relatório
-     * @param contadorValor Valor atual do contador
      */
     public void salvarOuAtualizar(int impressoraId, LocalDate dataRelatorio, BigDecimal contadorValor)
             throws SQLException {
@@ -56,16 +52,11 @@ public class HistoricoContadorDAO {
             stmt.executeUpdate();
         }
 
-        // Após gravar, garante que o limite de 60 registros não seja excedido
         limitarHistorico(impressoraId);
     }
 
     /**
      * Permite que um ADMIN edite manualmente um valor de contador no histórico.
-     *
-     * @param id            ID do registro em historico_contador
-     * @param novoValor     Novo valor do contador
-     * @param editadoPor    Username do admin que fez a correção
      */
     public boolean atualizarManual(int id, BigDecimal novoValor, String editadoPor) throws SQLException {
         String sql = "UPDATE historico_contador " +
@@ -81,10 +72,20 @@ public class HistoricoContadorDAO {
     }
 
     /**
+     * Deleta um registro específico do histórico (apenas ADMIN).
+     */
+    public boolean deletarRegistro(int id) throws SQLException {
+        String sql = "DELETE FROM historico_contador WHERE id = ?";
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            return stmt.executeUpdate() > 0;
+        }
+    }
+
+    /**
      * Lista todo o histórico com dados da impressora (JOIN),
      * opcionalmente filtrado por secretaria.
-     *
-     * @param secretaria "TODAS" ou nome específico
      */
     public List<HistoricoContador> listarTodos(String secretaria) throws SQLException {
         String sql = "SELECT hc.*, i.secretaria, i.local_instalacao, i.modelo_equipamento, i.numero_serie " +
@@ -163,7 +164,6 @@ public class HistoricoContadorDAO {
 
     /**
      * Garante que cada impressora tenha no máximo LIMITE_REGISTROS (60) entradas.
-     * Remove o(s) registro(s) mais antigo(s) quando o limite é excedido.
      */
     private void limitarHistorico(int impressoraId) throws SQLException {
         String sqlContar = "SELECT COUNT(*) FROM historico_contador WHERE impressora_id = ?";
@@ -211,7 +211,6 @@ public class HistoricoContadorDAO {
         h.setEditadoManual(rs.getBoolean("editado_manual"));
         h.setEditadoPor(rs.getString("editado_por"));
 
-        // Campos do JOIN com impressora
         h.setSecretaria(rs.getString("secretaria"));
         h.setLocalInstalacao(rs.getString("local_instalacao"));
         h.setModeloEquipamento(rs.getString("modelo_equipamento"));

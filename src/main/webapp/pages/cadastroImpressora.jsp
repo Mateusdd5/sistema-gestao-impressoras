@@ -147,15 +147,58 @@
             background: #fffbf0;
         }
 
-.form-check-input {
-    width: 2.5em;
-    height: 1.3em;
-    pointer-events: none;
-}
+        .form-check-input {
+            width: 2.5em;
+            height: 1.3em;
+            pointer-events: none;
+        }
 
         .form-check-input:checked {
             background-color: #28a745;
             border-color: #28a745;
+        }
+
+        /* Toggle modo correção */
+        .modo-correcao-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 2px solid #dee2e6;
+            background: white;
+            color: #6c757d;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            user-select: none;
+        }
+
+        .modo-correcao-btn:hover {
+            border-color: #fd7e14;
+            color: #fd7e14;
+        }
+
+        .modo-correcao-btn.ativo {
+            border-color: #fd7e14;
+            background: #fff3e0;
+            color: #e65c00;
+        }
+
+        .alerta-correcao {
+            display: none;
+            background: #fff3e0;
+            border: 1px solid #fd7e14;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            color: #7a3800;
+            margin-top: 6px;
+        }
+
+        .alerta-correcao.visivel {
+            display: block;
         }
     </style>
 </head>
@@ -247,6 +290,8 @@
                 <% if (isEdicao) { %>
                     <input type="hidden" name="id" value="<%= impressora.getId() %>">
                 <% } %>
+                <!-- Campo oculto para modo correção — padrão false -->
+                <input type="hidden" name="naoRotacionarContador" id="naoRotacionarContadorInput" value="false">
 
                 <div class="row">
                     <!-- Secretaria -->
@@ -358,13 +403,41 @@
                 <div class="row">
                     <!-- Contador de Impressões Atual -->
                     <div class="col-md-6 mb-3">
-                        <label for="contadorImpressoes" class="form-label">
-                            <i class="bi bi-123"></i> Contador de Impressões Atual *
-                            <span class="permission-badge badge-editable">Editável</span>
-                        </label>
-<input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes"
-       value="<%= isEdicao ? (isCanon ? impressora.getContadorImpressoes().toPlainString() : impressora.getContadorImpressoes().toBigInteger().toString()) : "0" %>"
-       min="0" step="<%= isCanon ? "0.01" : "1" %>" required>
+                        <!-- Toggle modo correção — visível apenas na edição -->
+                        <% if (isEdicao) { %>
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <label class="form-label mb-0">
+                                    <i class="bi bi-123"></i> Contador de Impressões Atual *
+                                    <span class="permission-badge badge-editable">Editável</span>
+                                </label>
+                                <span id="modoCorrecaoBtn"
+                                      class="modo-correcao-btn"
+                                      onclick="alternarModoCorrecao()"
+                                      title="Ative para corrigir o contador sem sobrescrever o valor anterior">
+                                    <i class="bi bi-exclamation-triangle" id="modoCorrecaoIcone"></i>
+                                    <span id="modoCorrecaoTexto">Modo Correção: OFF</span>
+                                </span>
+                            </div>
+                        <% } else { %>
+                            <label for="contadorImpressoes" class="form-label">
+                                <i class="bi bi-123"></i> Contador de Impressões Atual *
+                                <span class="permission-badge badge-editable">Editável</span>
+                            </label>
+                        <% } %>
+
+                        <input type="number" class="form-control" id="contadorImpressoes" name="contadorImpressoes"
+                               value="<%= isEdicao ? (isCanon ? impressora.getContadorImpressoes().toPlainString() : impressora.getContadorImpressoes().toBigInteger().toString()) : "0" %>"
+                               min="0" step="<%= isCanon ? "0.01" : "1" %>" required>
+
+                        <!-- Aviso do modo correção -->
+                        <% if (isEdicao) { %>
+                            <div id="alertaCorrecao" class="alerta-correcao">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <strong>Modo Correção ativo:</strong> o novo valor do contador
+                                <strong>não</strong> será copiado para o "Contador do Mês Anterior".
+                                Use apenas para corrigir um valor digitado incorretamente.
+                            </div>
+                        <% } %>
                     </div>
 
                     <!-- Contador do Mês Anterior -->
@@ -373,9 +446,9 @@
                             <i class="bi bi-clock-history"></i> Contador do Mês Anterior
                             <span class="permission-badge badge-editable">Editável</span>
                         </label>
-<input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior"
-       value="<%= isEdicao && impressora.getContadorAnterior() != null ? (isCanon ? impressora.getContadorAnterior().toPlainString() : impressora.getContadorAnterior().toBigInteger().toString()) : "" %>"
-       min="0" step="<%= isCanon ? "0.01" : "1" %>" placeholder="0">
+                        <input type="number" class="form-control" id="contadorAnterior" name="contadorAnterior"
+                               value="<%= isEdicao && impressora.getContadorAnterior() != null ? (isCanon ? impressora.getContadorAnterior().toPlainString() : impressora.getContadorAnterior().toBigInteger().toString()) : "" %>"
+                               min="0" step="<%= isCanon ? "0.01" : "1" %>" placeholder="0">
                         <small class="text-muted">
                             💡 Edite este valor se precisar corrigir o cálculo de impressões do mês. Deixe vazio para atualizar automaticamente.
                         </small>
@@ -484,6 +557,19 @@ function alternarCalculo() {
     desc.textContent = ativo
         ? 'A diferença de impressões desta impressora entrará no custo mensal'
         : 'Esta impressora não contribuirá para o custo mensal do relatório';
+}
+
+function alternarModoCorrecao() {
+    const btn     = document.getElementById('modoCorrecaoBtn');
+    const texto   = document.getElementById('modoCorrecaoTexto');
+    const alerta  = document.getElementById('alertaCorrecao');
+    const hidden  = document.getElementById('naoRotacionarContadorInput');
+
+    const ativo = btn.classList.toggle('ativo');
+
+    texto.textContent  = ativo ? 'Modo Correção: ON' : 'Modo Correção: OFF';
+    hidden.value       = ativo ? 'true' : 'false';
+    alerta.classList.toggle('visivel', ativo);
 }
 </script>
 </body>

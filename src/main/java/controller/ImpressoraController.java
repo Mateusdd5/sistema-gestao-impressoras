@@ -252,7 +252,8 @@ public class ImpressoraController extends HttpServlet {
         impressora.setDataRelatorioAnterior(dataRelatorioAnterior);
         impressora.setIncluirNoCalculo(incluirNoCalculo);
 
-        impressoraDAO.atualizarImpressora(impressora);
+        boolean naoRotacionarContador = "true".equals(request.getParameter("naoRotacionarContador"));
+        impressoraDAO.atualizarImpressora(impressora, naoRotacionarContador);
 
         response.setContentType("text/html; charset=UTF-8");
         PrintWriter out = response.getWriter();

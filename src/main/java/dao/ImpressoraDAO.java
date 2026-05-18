@@ -181,11 +181,23 @@ public class ImpressoraDAO {
 
     /**
      * Atualiza os dados de uma impressora.
-     * - Se o contador mudar, salva o antigo em contador_anterior.
-     * - Se a data do relatório atualizado mudar, salva a antiga em data_relatorio_anterior.
-     * - Registra automaticamente no histórico quando data ou contador mudam.
+     * Chama a versão completa com naoRotacionarContador = false (comportamento padrão).
      */
     public void atualizarImpressora(Impressora impressora) throws SQLException {
+        atualizarImpressora(impressora, false);
+    }
+
+    /**
+     * Atualiza os dados de uma impressora.
+     * - Se o contador mudar, salva o antigo em contador_anterior (exceto no modo correção).
+     * - Se a data do relatório atualizado mudar, salva a antiga em data_relatorio_anterior.
+     * - Registra automaticamente no histórico quando data ou contador mudam.
+     *
+     * @param naoRotacionarContador Se true, o valor atual do contador NÃO será
+     *                              copiado para contador_anterior ao ser alterado.
+     *                              Usar apenas em modo de correção manual.
+     */
+    public void atualizarImpressora(Impressora impressora, boolean naoRotacionarContador) throws SQLException {
         // Busca estado atual no banco
         Impressora impressoraAtual = buscarPorId(impressora.getId());
 
@@ -230,8 +242,10 @@ public class ImpressoraDAO {
             stmt.setString(4, impressora.getNumeroSerie());
             stmt.setBigDecimal(5, impressora.getContadorImpressoes());
 
-            // Rotação do contador: se mudou, salva o anterior
-            if (impressoraAtual != null &&
+            // Rotação do contador:
+            // - Modo normal:    se mudou, copia valor antigo para contador_anterior
+            // - Modo correção:  não rotaciona — mantém o contador_anterior como está
+            if (!naoRotacionarContador && impressoraAtual != null &&
                 impressora.getContadorImpressoes().compareTo(impressoraAtual.getContadorImpressoes()) != 0) {
                 stmt.setBigDecimal(6, impressoraAtual.getContadorImpressoes());
             } else if (impressora.getContadorAnterior() != null) {
@@ -262,7 +276,8 @@ public class ImpressoraDAO {
                 throw new SQLException("Falha ao atualizar impressora. Nenhuma linha afetada.");
             }
 
-            System.out.println("Impressora atualizada com sucesso - ID: " + impressora.getId());
+            System.out.println("Impressora atualizada com sucesso - ID: " + impressora.getId() +
+                               (naoRotacionarContador ? " [modo correção]" : ""));
 
         } catch (SQLException e) {
             System.err.println("Erro ao atualizar impressora ID: " + impressora.getId());

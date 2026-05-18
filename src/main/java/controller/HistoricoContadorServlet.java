@@ -73,11 +73,11 @@ public class HistoricoContadorServlet extends HttpServlet {
             return;
         }
 
-        // Apenas ADMIN pode editar o histórico
+        // Apenas ADMIN pode editar ou deletar registros do histórico
         if (!usuarioLogado.isAdmin()) {
             response.setContentType("text/html; charset=UTF-8");
             PrintWriter out = response.getWriter();
-            out.println("<script>alert('Apenas administradores podem editar o histórico.'); history.back();</script>");
+            out.println("<script>alert('Apenas administradores podem modificar o histórico.'); history.back();</script>");
             out.close();
             return;
         }
@@ -95,6 +95,9 @@ public class HistoricoContadorServlet extends HttpServlet {
                 case "editar":
                     editarRegistro(request, response, historicoDAO, usuarioLogado);
                     break;
+                case "deletar":
+                    deletarRegistro(request, response, historicoDAO);
+                    break;
                 default:
                     response.sendRedirect(request.getContextPath() + "/HistoricoContadorServlet");
             }
@@ -102,14 +105,12 @@ public class HistoricoContadorServlet extends HttpServlet {
         } catch (SQLException e) {
             e.printStackTrace();
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-                    "Erro ao editar histórico: " + e.getMessage());
+                    "Erro ao processar histórico: " + e.getMessage());
         }
     }
 
     /**
-     * Lista o histórico.
-     * - Usuário de secretaria: vê apenas a própria secretaria, sem filtro manual.
-     * - Usuário TI: pode filtrar por secretaria livremente.
+     * Lista o histórico respeitando o escopo do usuário logado.
      */
     private void listarHistorico(HttpServletRequest request, HttpServletResponse response,
                                  HistoricoContadorDAO historicoDAO, ImpressoraDAO impressoraDAO,
@@ -120,7 +121,6 @@ public class HistoricoContadorServlet extends HttpServlet {
         boolean filtroFixo = usuarioLogado.isUsuarioSecretaria();
 
         if (filtroFixo) {
-            // Secretaria vinculada ao login — não pode ser alterada
             secretariaFiltro = usuarioLogado.getSecretariaVinculada();
         } else {
             secretariaFiltro = request.getParameter("secretaria");
@@ -173,6 +173,35 @@ public class HistoricoContadorServlet extends HttpServlet {
         } else {
             response.sendRedirect(request.getContextPath() +
                     "/HistoricoContadorServlet?erro=erro_editar&secretaria=" + secretariaFiltro);
+        }
+    }
+
+    /**
+     * Deleta um registro do histórico (apenas ADMIN).
+     */
+    private void deletarRegistro(HttpServletRequest request, HttpServletResponse response,
+                                 HistoricoContadorDAO historicoDAO)
+            throws SQLException, IOException {
+
+        String idStr            = request.getParameter("id");
+        String secretariaFiltro = request.getParameter("secretariaFiltro");
+        if (secretariaFiltro == null) secretariaFiltro = "TODAS";
+
+        if (idStr == null || idStr.trim().isEmpty()) {
+            response.sendRedirect(request.getContextPath() +
+                    "/HistoricoContadorServlet?erro=dados_invalidos&secretaria=" + secretariaFiltro);
+            return;
+        }
+
+        int id = Integer.parseInt(idStr.trim());
+        boolean sucesso = historicoDAO.deletarRegistro(id);
+
+        if (sucesso) {
+            response.sendRedirect(request.getContextPath() +
+                    "/HistoricoContadorServlet?sucesso=registro_deletado&secretaria=" + secretariaFiltro);
+        } else {
+            response.sendRedirect(request.getContextPath() +
+                    "/HistoricoContadorServlet?erro=erro_deletar&secretaria=" + secretariaFiltro);
         }
     }
 }

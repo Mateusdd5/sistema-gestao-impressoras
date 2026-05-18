@@ -65,21 +65,58 @@
 
         .btn { border-radius: 10px; }
 
-        .table-container {
-            overflow-x: auto;
-            overflow-y: auto;
-            max-height: calc(100vh - 300px);
+        /* Cabeçalho de grupo por impressora */
+        .grupo-impressora-header {
+            background: linear-gradient(135deg, #f0f0ff 0%, #e8e8f8 100%);
+            border-left: 4px solid #667eea;
+            padding: 8px 14px;
+            margin-top: 18px;
+            margin-bottom: 2px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
-        .table thead th {
+        .grupo-impressora-header:first-child {
+            margin-top: 0;
+        }
+
+        .grupo-impressora-header .info-impressora {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.92rem;
+        }
+
+        .grupo-impressora-header .serie-impressora {
+            color: #6c757d;
+            font-size: 0.82rem;
+        }
+
+        .table-grupo {
+            margin-bottom: 0;
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+        }
+
+        .table-grupo thead th {
             background: #f8f9fa;
             color: #495057;
             font-weight: 600;
             border-bottom: 2px solid #dee2e6;
             white-space: nowrap;
+            font-size: 0.88rem;
+            padding: 8px 10px;
         }
 
-        .table tbody tr:hover { background: #f8f9fa; }
+        .table-grupo tbody td {
+            font-size: 0.9rem;
+            padding: 8px 10px;
+            vertical-align: middle;
+        }
+
+        .table-grupo tbody tr:hover { background: #f8f9fa; }
 
         .badge-editado {
             background: #fd7e14;
@@ -89,8 +126,8 @@
             border-radius: 6px;
         }
 
-        .btn-editar-inline {
-            padding: 2px 8px;
+        .btn-acao-inline {
+            padding: 2px 7px;
             font-size: 12px;
             border-radius: 6px;
         }
@@ -104,6 +141,13 @@
             font-size: 13px;
         }
 
+        .wrapper-grupo {
+            margin-bottom: 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
         @media print {
             body { background: white !important; padding: 0; }
             .no-print { display: none !important; }
@@ -115,7 +159,6 @@
                 print-color-adjust: exact;
                 border-radius: 0 !important;
             }
-            .table-container { max-height: none !important; overflow: visible !important; }
             .main-wrapper { padding: 0; }
             @page { size: landscape; margin: 1cm; }
         }
@@ -141,9 +184,8 @@
     String sucesso = request.getParameter("sucesso");
     String erro    = request.getParameter("erro");
 
-    boolean isAdmin      = usuarioLogado != null && usuarioLogado.isAdmin();
-    // Badge de "editado" visível apenas para técnico, operador e admin
-    boolean verEditados  = usuarioLogado != null && !usuarioLogado.isViewer();
+    boolean isAdmin     = usuarioLogado != null && usuarioLogado.isAdmin();
+    boolean verEditados = usuarioLogado != null && !usuarioLogado.isViewer();
 
     DecimalFormat dfContador = new DecimalFormat("#,##0.##");
 %>
@@ -197,7 +239,6 @@
                     <% } %>
                 </h4>
                 <div class="d-flex gap-2 flex-wrap no-print">
-                    <!-- Filtro por secretaria: oculto para usuários de secretaria -->
                     <% if (!filtroFixo) { %>
                         <form action="<%= request.getContextPath() %>/HistoricoContadorServlet" method="get"
                               class="d-flex gap-2 align-items-center">
@@ -234,6 +275,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <% } %>
+            <% if ("registro_deletado".equals(sucesso)) { %>
+                <div class="alert alert-success alert-dismissible fade show no-print">
+                    <i class="bi bi-check-circle"></i> Registro removido com sucesso.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <% } %>
             <% if (erro != null) { %>
                 <div class="alert alert-danger alert-dismissible fade show no-print">
                     <i class="bi bi-exclamation-triangle"></i> Erro ao processar a operação.
@@ -258,43 +305,63 @@
                 <% if (isAdmin) { %>
                     <span class="ms-3 text-muted no-print" style="font-size:0.82rem;">
                         <i class="bi bi-pencil-square"></i>
-                        Clique no ícone de edição para corrigir um valor de contador.
+                        Use os botões à direita para editar ou remover um registro.
                     </span>
                 <% } %>
             </div>
 
-            <!-- Tabela -->
-            <div class="table-container">
-                <% if (listaHistorico != null && !listaHistorico.isEmpty()) { %>
-                    <table class="table table-hover table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Secretaria</th>
-                                <th>Local</th>
-                                <th>Modelo</th>
-                                <th>Nº Série</th>
-                                <th>Data do Relatório</th>
-                                <th class="text-end">Contador</th>
-                                <% if (verEditados) { %>
-                                    <th class="text-center">Editado?</th>
-                                <% } %>
-                                <th>Gravado em</th>
-                                <% if (isAdmin) { %>
-                                    <th class="text-center no-print">Ação</th>
-                                <% } %>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% for (HistoricoContador h : listaHistorico) { %>
+            <!-- Conteúdo agrupado por impressora -->
+            <%
+            if (listaHistorico != null && !listaHistorico.isEmpty()) {
+                String serieAtual = "";
+                boolean primeiroGrupo = true;
+
+                for (int idx = 0; idx < listaHistorico.size(); idx++) {
+                    HistoricoContador h = listaHistorico.get(idx);
+
+                    // Detecta mudança de impressora
+                    boolean novaImpressora = !h.getNumeroSerie().equals(serieAtual);
+
+                    if (novaImpressora) {
+                        // Fecha a tabela do grupo anterior (se não for o primeiro)
+                        if (!primeiroGrupo) { %>
+                                </tbody>
+                            </table>
+                        </div>
+                    <%  }
+
+                        serieAtual = h.getNumeroSerie();
+                        primeiroGrupo = false;
+            %>
+                    <!-- Cabeçalho do grupo -->
+                    <div class="wrapper-grupo">
+                        <div class="grupo-impressora-header">
+                            <span class="badge bg-primary"><%= h.getSecretaria() %></span>
+                            <span class="info-impressora">
+                                <i class="bi bi-printer"></i>
+                                <%= h.getLocalInstalacao() %> &mdash; <%= h.getModeloEquipamento() %>
+                            </span>
+                            <span class="serie-impressora">
+                                <i class="bi bi-upc-scan"></i> <%= h.getNumeroSerie() %>
+                            </span>
+                        </div>
+
+                        <!-- Tabela do grupo -->
+                        <table class="table table-hover table-grupo mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Data do Relatório</th>
+                                    <th class="text-end">Contador</th>
+                                    <% if (verEditados) { %><th class="text-center">Editado?</th><% } %>
+                                    <th>Gravado em</th>
+                                    <% if (isAdmin) { %><th class="text-center no-print">Ações</th><% } %>
+                                </tr>
+                            </thead>
+                            <tbody>
+            <%  } // fim novaImpressora %>
+
+                                <!-- Linha de registro -->
                                 <tr id="linha-<%= h.getId() %>">
-                                    <td>
-                                        <span class="badge bg-primary">
-                                            <%= h.getSecretaria() %>
-                                        </span>
-                                    </td>
-                                    <td><%= h.getLocalInstalacao() %></td>
-                                    <td><%= h.getModeloEquipamento() %></td>
-                                    <td><small class="text-muted"><%= h.getNumeroSerie() %></small></td>
                                     <td style="white-space:nowrap;">
                                         <i class="bi bi-calendar-check text-success"></i>
                                         <%= h.getDataRelatorioFormatada() %>
@@ -329,41 +396,56 @@
                                     </td>
                                     <% if (isAdmin) { %>
                                         <td class="text-center no-print">
-                                            <button class="btn btn-sm btn-warning btn-editar-inline"
+                                            <!-- Botão editar -->
+                                            <button class="btn btn-sm btn-warning btn-acao-inline"
                                                     id="btn-editar-<%= h.getId() %>"
                                                     onclick="iniciarEdicao(<%= h.getId() %>)"
                                                     title="Editar contador">
                                                 <i class="bi bi-pencil"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-success btn-editar-inline"
+                                            <!-- Botão salvar (oculto) -->
+                                            <button class="btn btn-sm btn-success btn-acao-inline"
                                                     id="btn-salvar-<%= h.getId() %>"
                                                     style="display:none;"
                                                     onclick="salvarEdicao(<%= h.getId() %>, '<%= secretariaFiltro %>')"
                                                     title="Salvar">
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-secondary btn-editar-inline"
+                                            <!-- Botão cancelar (oculto) -->
+                                            <button class="btn btn-sm btn-secondary btn-acao-inline"
                                                     id="btn-cancelar-<%= h.getId() %>"
                                                     style="display:none;"
                                                     onclick="cancelarEdicao(<%= h.getId() %>)"
                                                     title="Cancelar">
                                                 <i class="bi bi-x-lg"></i>
                                             </button>
+                                            <!-- Botão deletar -->
+                                            <button class="btn btn-sm btn-danger btn-acao-inline"
+                                                    id="btn-deletar-<%= h.getId() %>"
+                                                    onclick="deletarRegistro(<%= h.getId() %>, '<%= secretariaFiltro %>')"
+                                                    title="Remover registro">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </td>
                                     <% } %>
                                 </tr>
-                            <% } %>
-                        </tbody>
-                    </table>
-                <% } else { %>
-                    <div class="alert alert-info text-center">
-                        <i class="bi bi-info-circle" style="font-size:2rem;"></i>
-                        <h5 class="mt-2">Nenhum registro de histórico encontrado</h5>
-                        <p>Os registros são criados automaticamente quando a data do relatório
-                           de uma impressora é atualizada.</p>
+
+            <%  } // fim for
+
+                // Fecha a última tabela aberta
+                if (!listaHistorico.isEmpty()) { %>
+                            </tbody>
+                        </table>
                     </div>
-                <% } %>
-            </div>
+            <%  }
+            } else { %>
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle" style="font-size:2rem;"></i>
+                    <h5 class="mt-2">Nenhum registro de histórico encontrado</h5>
+                    <p>Os registros são criados automaticamente quando a data do relatório
+                       de uma impressora é atualizada.</p>
+                </div>
+            <% } %>
 
             <!-- Legenda -->
             <div class="mt-3 no-print">
@@ -400,20 +482,22 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 function iniciarEdicao(id) {
-    document.getElementById('valor-'        + id).style.display = 'none';
-    document.getElementById('input-'        + id).style.display = 'inline-block';
-    document.getElementById('btn-editar-'   + id).style.display = 'none';
-    document.getElementById('btn-salvar-'   + id).style.display = 'inline-block';
-    document.getElementById('btn-cancelar-' + id).style.display = 'inline-block';
+    document.getElementById('valor-'          + id).style.display = 'none';
+    document.getElementById('input-'          + id).style.display = 'inline-block';
+    document.getElementById('btn-editar-'     + id).style.display = 'none';
+    document.getElementById('btn-salvar-'     + id).style.display = 'inline-block';
+    document.getElementById('btn-cancelar-'   + id).style.display = 'inline-block';
+    document.getElementById('btn-deletar-'    + id).style.display = 'none';
     document.getElementById('input-' + id).focus();
 }
 
 function cancelarEdicao(id) {
-    document.getElementById('valor-'        + id).style.display = 'inline';
-    document.getElementById('input-'        + id).style.display = 'none';
-    document.getElementById('btn-editar-'   + id).style.display = 'inline-block';
-    document.getElementById('btn-salvar-'   + id).style.display = 'none';
-    document.getElementById('btn-cancelar-' + id).style.display = 'none';
+    document.getElementById('valor-'          + id).style.display = 'inline';
+    document.getElementById('input-'          + id).style.display = 'none';
+    document.getElementById('btn-editar-'     + id).style.display = 'inline-block';
+    document.getElementById('btn-salvar-'     + id).style.display = 'none';
+    document.getElementById('btn-cancelar-'   + id).style.display = 'none';
+    document.getElementById('btn-deletar-'    + id).style.display = 'inline-block';
 }
 
 function salvarEdicao(id, secretariaFiltro) {
@@ -430,16 +514,30 @@ function salvarEdicao(id, secretariaFiltro) {
         return;
     }
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '<%= request.getContextPath() %>/HistoricoContadorServlet';
-
-    const campos = {
+    submeterFormulario({
         action:           'editar',
         id:               id,
         contadorValor:    novoValor,
         secretariaFiltro: secretariaFiltro
-    };
+    });
+}
+
+function deletarRegistro(id, secretariaFiltro) {
+    if (!confirm('Tem certeza que deseja remover este registro do histórico?\n\nEsta ação não pode ser desfeita.')) {
+        return;
+    }
+
+    submeterFormulario({
+        action:           'deletar',
+        id:               id,
+        secretariaFiltro: secretariaFiltro
+    });
+}
+
+function submeterFormulario(campos) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '<%= request.getContextPath() %>/HistoricoContadorServlet';
 
     for (const [name, value] of Object.entries(campos)) {
         const input = document.createElement('input');
